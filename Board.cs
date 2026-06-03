@@ -89,6 +89,15 @@ public class Board
             
             boardPieces[toRow, toCol] = boardPieces[fromRow, fromCol];
             boardPieces[fromRow, fromCol] = new Empty();
+
+            if (boardPieces[toRow, toCol] is Pawn)
+            {
+                Pawn checkPromotablePawn = (Pawn)boardPieces[toRow, toCol];
+                if (checkPromotablePawn.IsPromotable(toRow))
+                {
+                    boardPieces[toRow, toCol] = new Queen(isWhiteMoving);
+                }
+            }
         }
         else
         {

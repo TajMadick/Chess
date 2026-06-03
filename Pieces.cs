@@ -39,22 +39,46 @@ public abstract class Pieces
 
 public class Pawn : Pieces
 {
-    public Pawn(bool isWhite) : base(isWhite) {}
+    public Pawn(bool isWhite) : base(isWhite)
+    {
+        IsEnPassantable = false;
+    }
 
+    private bool IsEnPassantable { get; set; }
+
+    public bool IsPromotable(int row)
+    {
+        int end = (IsWhite) ? 0 : 7;
+        return row == end;
+    }
+    
     public override bool MoveAllowed(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
     {
+        IsEnPassantable = false;
         int start = (IsWhite) ? 6 : 1;
         int dir = (IsWhite) ? 1 : -1;
 
         int moveTwoField = fromRow - 2 * dir;
         int moveOneField = fromRow - 1 * dir;
 
-        int diffCol = Math.Abs(toCol - fromCol);
+        int diffCol = toCol - fromCol;
 
         // Diagonal nehmen -> nur 1 nach links oder rechts, es muss eine Figur dort stehen, es muss das nächste Feld sein
-        if (diffCol == 1 && boardPieces[toRow, toCol] is not Empty && moveOneField == toRow)
+        if (Math.Abs(diffCol) == 1 && boardPieces[toRow, toCol] is not Empty && moveOneField == toRow)
         {
             return true;
+        }
+        
+        // En Passant -> nur 1 nach links oder rechts, muss das nächste Feld sein, das Piece daneben muss ein Bauer sein
+        if (Math.Abs(diffCol) == 1 && moveOneField == toRow && boardPieces[fromRow, fromCol + diffCol] is Pawn)
+        {
+            // wenn das Piece daneben EnPassantable is dann bam
+            Pawn besidePawn = (Pawn)boardPieces[fromRow, fromCol + diffCol];
+            if (besidePawn.IsEnPassantable)
+            {
+                boardPieces[fromRow, fromCol + diffCol] = new Empty();
+                return true;
+            }
         }
         
         if (fromCol != toCol)
@@ -70,6 +94,7 @@ public class Pawn : Pieces
             // check if nextField and next-nextField is free
             if (boardPieces[moveOneField, fromCol] is Empty && boardPieces[moveTwoField, fromCol] is Empty)
             {
+                IsEnPassantable = true;
                 return true;
             }
         }
