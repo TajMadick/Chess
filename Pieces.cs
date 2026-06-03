@@ -49,6 +49,14 @@ public class Pawn : Pieces
         int moveTwoField = fromRow - 2 * dir;
         int moveOneField = fromRow - 1 * dir;
 
+        int diffCol = Math.Abs(toCol - fromCol);
+
+        // Diagonal nehmen -> nur 1 nach links oder rechts, es muss eine Figur dort stehen, es muss das nächste Feld sein
+        if (diffCol == 1 && boardPieces[toRow, toCol] is not Empty && moveOneField == toRow)
+        {
+            return true;
+        }
+        
         if (fromCol != toCol)
         {
             Console.Write("Pawn can only move vertically");
@@ -57,7 +65,7 @@ public class Pawn : Pieces
         }
         
         // Pawn first move 2 fields
-        if (fromRow == start && fromRow - 2 * dir == toRow)
+        if (fromRow == start && moveTwoField == toRow)
         {
             // check if nextField and next-nextField is free
             if (boardPieces[moveOneField, fromCol] is Empty && boardPieces[moveTwoField, fromCol] is Empty)
@@ -67,7 +75,7 @@ public class Pawn : Pieces
         }
         
         // Pawn normal move
-        if (fromRow - 1 * dir == toRow)
+        if (moveOneField == toRow)
         {
             // check if nextField is free
             if (boardPieces[moveOneField, fromCol] is Empty)
