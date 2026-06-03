@@ -54,7 +54,15 @@ public class Board
         // Falls versucht leeres Feld zu bewegen
         if (boardPieces[fromRow, fromCol] is Empty)
         {
-            Console.Write($"From Location ist Empty");
+            Console.Write($"From Location is Empty");
+            Console.ReadKey();
+            return false;
+        }
+
+        // Falls versucht auf selbes Feld zu gehen
+        if (fromRow == toRow && fromCol == toCol)
+        {
+            Console.Write($"From Location ist die selbe als To Location");
             Console.ReadKey();
             return false;
         }
@@ -68,8 +76,15 @@ public class Board
             return false;
         }
         
-        if (boardPieces[fromRow,fromCol].MoveAllowed(fromRow, fromCol, toRow, toCol))
+        if (boardPieces[fromRow,fromCol].MoveAllowed(fromRow, fromCol, toRow, toCol, boardPieces))
         {
+            if (boardPieces[toRow, toCol].IsWhite == isWhiteMoving && boardPieces[toRow, toCol] is not Empty)
+            {
+                Console.Write($"Can't take pieces from your own color");
+                Console.ReadKey();
+                return false;
+            }
+            
             boardPieces[toRow, toCol] = boardPieces[fromRow, fromCol];
             boardPieces[fromRow, fromCol] = new Empty();
         }
@@ -77,6 +92,7 @@ public class Board
         {
             Console.WriteLine("neiiiinnn");
             Console.ReadKey();
+            return false;
         }
         
         return true;
