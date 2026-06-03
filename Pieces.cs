@@ -15,17 +15,23 @@ public abstract class Pieces
         fromCol += dirCol;
         for (; fromRow is >= 0 and < 8 && fromCol is >= 0 and < 8; fromRow += dirRow, fromCol += dirCol)
         {
+            // wenn die Runner es bis zum Ziel geschafft haben -> true
             if (fromCol == toCol && fromRow == toRow)
             {
                 return true;
             }
 
+            // wenn ein Feld auf dem Weg nicht leer ist -> false
             if (boardPieces[fromRow, fromCol] is not Empty)
             {
+                Console.Write("Piece is in the way");
+                Console.ReadKey();
                 return false;
             }
         }
 
+        Console.Write("Incorrect movement");
+        Console.ReadKey();
         return false;
     }
     public bool IsWhite { get; }
@@ -45,6 +51,8 @@ public class Pawn : Pieces
 
         if (fromCol != toCol)
         {
+            Console.Write("Pawn can only move vertically");
+            Console.ReadKey();
             return false;
         }
         
@@ -68,6 +76,8 @@ public class Pawn : Pieces
             }
         }
 
+        Console.Write("Incorrect movement");
+        Console.ReadKey();
         return false;
     }
     public override char GetIcon()
@@ -92,6 +102,8 @@ public class Knight : Pieces
             return true;
         }
 
+        Console.Write("Incorrect movement");
+        Console.ReadKey();
         return false;
     }
 
@@ -111,23 +123,10 @@ public class Bishop : Pieces
         int diffCol = Math.Abs(toCol - fromCol);
         int diffRow = Math.Abs(toRow - fromRow);
         
-        /*
-        // maybe kann man das if wegmachen TODO das schaun ob das geht
-        if (diffRow == diffCol)
-        {
-            int dirCol = (toCol - fromCol > 0) ? 1 : -1;
-           int dirRow = (toRow - fromRow > 0) ? 1 : -1;
-           
-           return LoopThrough(fromRow, fromCol, toRow, toCol, dirRow, dirCol, boardPieces);
-        }
-        */
-        
         int dirCol = (toCol - fromCol > 0) ? 1 : -1;
         int dirRow = (toRow - fromRow > 0) ? 1 : -1;
             
         return LoopThrough(fromRow, fromCol, toRow, toCol, dirRow, dirCol, boardPieces);
-        
-        return false;
     }
 
     public override char GetIcon()
@@ -145,19 +144,20 @@ public class Rook : Pieces
     {
         int dirCol = 0, dirRow = 0;
         
+        // Rook läuft auf Cols -> Horizontal
         if (fromRow == toRow)
         {
             dirCol = (toCol - fromCol > 0) ? 1 : -1;
 
         }
+        
+        // Rook läuft auf Rows -> Vertikal
         if (fromCol == toCol)
         {
             dirRow = (toRow - fromRow > 0) ? 1 : -1;
         }
             
         return LoopThrough(fromRow, fromCol, toRow, toCol, dirRow, dirCol, boardPieces);
-
-        return false;
     }
 
     public override char GetIcon()
@@ -175,26 +175,23 @@ public class Queen : Pieces
     {
         int diffCol = Math.Abs(toCol - fromCol);
         int diffRow = Math.Abs(toRow - fromRow);
-
-        /*
-        if (diffCol == diffRow || fromRow == toRow || fromCol == toCol)
-        {
-            return true;
-        }
-        */
         
         int dirCol = 0, dirRow = 0;
         
+        // Queen läuft auf Cols -> Horizontal
         if (fromRow == toRow)
         {
             dirCol = (toCol - fromCol > 0) ? 1 : -1;
 
         }
+        
+        // Queen läuft auf Rows -> Vertikal
         if (fromCol == toCol)
         {
             dirRow = (toRow - fromRow > 0) ? 1 : -1;
         }
 
+        // Queen läuft diagonal
         if (diffCol == diffRow)
         {
             dirCol = (toCol - fromCol > 0) ? 1 : -1;
@@ -202,8 +199,6 @@ public class Queen : Pieces
         }
         
         return LoopThrough(fromRow, fromCol, toRow, toCol, dirRow, dirCol, boardPieces);
-
-        return false;
     }
 
     public override char GetIcon()
@@ -227,6 +222,8 @@ public class King : Pieces
             return true;
         }
 
+        Console.Write("Incorrect movement");
+        Console.ReadKey();
         return false;
     }
 
