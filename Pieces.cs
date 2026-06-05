@@ -6,10 +6,12 @@ public abstract class Pieces
     {
         IsWhite = isWhite;
     }
+    
+    public bool IsWhite { get; }
     public abstract char GetIcon();
     public abstract bool MoveAllowed(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces);
 
-    public bool LoopThrough(int fromRow, int fromCol, int toRow, int toCol, int dirRow, int dirCol, Pieces[,] boardPieces)
+    protected bool LoopThrough(int fromRow, int fromCol, int toRow, int toCol, int dirRow, int dirCol, Pieces[,] boardPieces)
     {
         fromRow += dirRow;
         fromCol += dirCol;
@@ -24,17 +26,16 @@ public abstract class Pieces
             // wenn ein Feld auf dem Weg nicht leer ist -> false
             if (boardPieces[fromRow, fromCol] is not Empty)
             {
-                Console.Write("Piece is in the way");
+                Console.WriteLine("Piece is in the way");
                 Console.ReadKey();
                 return false;
             }
         }
 
-        Console.Write("Incorrect movement");
+        Console.WriteLine("Incorrect movement");
         Console.ReadKey();
         return false;
     }
-    public bool IsWhite { get; }
 }
 
 public class Pawn : Pieces
@@ -55,6 +56,7 @@ public class Pawn : Pieces
     public override bool MoveAllowed(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
     {
         IsEnPassantable = false;
+        
         int start = (IsWhite) ? 6 : 1;
         int dir = (IsWhite) ? 1 : -1;
 
@@ -83,7 +85,7 @@ public class Pawn : Pieces
         
         if (fromCol != toCol)
         {
-            Console.Write("Pawn can only move vertically");
+            Console.WriteLine("Pawn can only move vertically");
             Console.ReadKey();
             return false;
         }
@@ -109,7 +111,7 @@ public class Pawn : Pieces
             }
         }
 
-        Console.Write("Incorrect movement");
+        Console.WriteLine("Incorrect movement");
         Console.ReadKey();
         return false;
     }
@@ -135,7 +137,7 @@ public class Knight : Pieces
             return true;
         }
 
-        Console.Write("Incorrect movement");
+        Console.WriteLine("Incorrect movement");
         Console.ReadKey();
         return false;
     }
@@ -153,9 +155,6 @@ public class Bishop : Pieces
 
     public override bool MoveAllowed(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
     {
-        int diffCol = Math.Abs(toCol - fromCol);
-        int diffRow = Math.Abs(toRow - fromRow);
-        
         int dirCol = (toCol - fromCol > 0) ? 1 : -1;
         int dirRow = (toRow - fromRow > 0) ? 1 : -1;
             
@@ -171,7 +170,12 @@ public class Bishop : Pieces
 
 public class Rook : Pieces
 {
-    public Rook(bool isWhite) : base(isWhite) { }
+    public Rook(bool isWhite) : base(isWhite)
+    {
+        HasMoved = false;
+    }
+    
+    public bool HasMoved { get; set; }
 
     public override bool MoveAllowed(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
     {
@@ -190,7 +194,10 @@ public class Rook : Pieces
             dirRow = (toRow - fromRow > 0) ? 1 : -1;
         }
             
-        return LoopThrough(fromRow, fromCol, toRow, toCol, dirRow, dirCol, boardPieces);
+        bool allowed = LoopThrough(fromRow, fromCol, toRow, toCol, dirRow, dirCol, boardPieces);
+        if (allowed) HasMoved = true;
+
+        return allowed;
     }
 
     public override char GetIcon()
@@ -243,19 +250,35 @@ public class Queen : Pieces
 
 public class King : Pieces
 {
-    public King(bool isWhite) : base(isWhite) { }
+    public King(bool isWhite) : base(isWhite)
+    {
+        HasMoved = false;
+    }
+    
+    private bool HasMoved { get; set; }
 
     public override bool MoveAllowed(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
     {
-        int diffCol = Math.Abs(toCol - fromCol);
-        int diffRow = Math.Abs(toRow - fromRow);
+        int diffCol = toCol - fromCol;
+        int diffRow = toRow - fromRow;
+        
+        int start = (IsWhite) ? 7 : 0;
 
-        if (diffCol <= 1 && diffRow <= 1)
+        int rookCol = (diffCol > 0) ? 7 : 0;
+        int dirCol = (diffCol > 0) ? 1 : -1;
+
+        if (Math.Abs(diffCol) <= 1 && Math.Abs(diffRow) <= 1)
         {
+            HasMoved = true; 
             return true;
         }
+        
+        if (!HasMoved && boardPieces[start, rookCol] is Rook { HasMoved: false })
+        {
+            return LoopThrough(fromRow, fromCol, toRow, toCol, 0, dirCol, boardPieces);
+        }
 
-        Console.Write("Incorrect movement");
+        Console.WriteLine("Incorrect movement");
         Console.ReadKey();
         return false;
     }

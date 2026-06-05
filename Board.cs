@@ -76,20 +76,33 @@ public class Board
             return false;
         }
         
+        // das Zielfeld darf nicht von der gleichen Farbe sein 
+        // wenn das Zielfeld von der gleichen Farbe ist aber leer dann passts
+        if (boardPieces[toRow, toCol].IsWhite == isWhiteMoving && boardPieces[toRow, toCol] is not Empty)
+        {
+            Console.Write("Can't take pieces from your own color");
+            Console.ReadKey();
+            return false;
+        }
+        
         if (boardPieces[fromRow,fromCol].MoveAllowed(fromRow, fromCol, toRow, toCol, boardPieces))
         {
-            // das Zielfeld darf nicht von der gleichen Farbe sein 
-            // wenn das Zielfeld von der gleichen Farbe ist aber leer dann passts
-            if (boardPieces[toRow, toCol].IsWhite == isWhiteMoving && boardPieces[toRow, toCol] is not Empty)
-            {
-                Console.Write("Can't take pieces from your own color");
-                Console.ReadKey();
-                return false;
-            }
-            
             boardPieces[toRow, toCol] = boardPieces[fromRow, fromCol];
             boardPieces[fromRow, fromCol] = new Empty();
+            
+            // Castle Check
+            if (boardPieces[toRow, toCol] is King && Math.Abs(toCol - fromCol) == 2)
+            {
+                int diffCol = toCol - fromCol;
+                int dir = (diffCol > 0) ? 1 : -1;
+                int rookCol = (diffCol > 0) ? 7 : 0;
 
+                // moving rook
+                boardPieces[fromRow, fromCol + dir] = boardPieces[fromRow, rookCol];
+                boardPieces[fromRow, rookCol] = new Empty();
+            }
+
+            // Pawn Promotion
             if (boardPieces[toRow, toCol] is Pawn)
             {
                 Pawn checkPromotablePawn = (Pawn)boardPieces[toRow, toCol];
@@ -109,7 +122,7 @@ public class Board
     private void FillBoard()
     {
         // Empty
-        for (int i = 2; i < 6; i++)
+        for (int i = 0; i < 8; i++)
         {
             for (int j = 0; j < 8; j++)
             {
@@ -130,6 +143,8 @@ public class Board
         boardPieces[7, 0] = new Rook(true);
         boardPieces[7, 7] = new Rook(true);
         
+        /*
+         
         // Knight
         boardPieces[0, 1] = new Knight(false);
         boardPieces[0, 6] = new Knight(false);
@@ -145,6 +160,8 @@ public class Board
         // Queen
         boardPieces[0, 3] = new Queen(false);
         boardPieces[7, 3] = new Queen(true);
+        
+        */
         
         // King
         boardPieces[0, 4] = new King(false);
