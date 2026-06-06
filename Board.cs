@@ -45,11 +45,11 @@ public class Board
         char toLetter = move[2];
         char toNumber = move[3];
         
-        int fromRow = 7 - ((int)fromNumber - '1'); 
-        int toRow = 7 - ((int)toNumber - '1'); 
+        int fromRow = 7 - (fromNumber - '1'); 
+        int toRow = 7 - (toNumber - '1'); 
         
-        int fromCol = (int)fromLetter - 'a';
-        int toCol = (int)toLetter - 'a';
+        int fromCol = fromLetter - 'a';
+        int toCol = toLetter - 'a';
 
         // Falls versucht leeres Feld zu bewegen
         if (boardPieces[fromRow, fromCol] is Empty)
@@ -76,7 +76,7 @@ public class Board
             return false;
         }
         
-        // das Zielfeld darf nicht von der gleichen Farbe sein 
+        // das Zielfeld darf nicht von der gleichen Farbe sein, 
         // wenn das Zielfeld von der gleichen Farbe ist aber leer dann passts
         if (boardPieces[toRow, toCol].IsWhite == isWhiteMoving && boardPieces[toRow, toCol] is not Empty)
         {
@@ -87,8 +87,19 @@ public class Board
         
         if (boardPieces[fromRow,fromCol].MoveAllowed(fromRow, fromCol, toRow, toCol, boardPieces))
         {
+            Pieces oldPiece = boardPieces[toRow, toCol];
             boardPieces[toRow, toCol] = boardPieces[fromRow, fromCol];
             boardPieces[fromRow, fromCol] = new Empty();
+
+            if (IsCheck(isWhiteMoving))
+            {
+                boardPieces[fromRow, fromCol] = boardPieces[toRow, toCol];
+                boardPieces[toRow, toCol] = oldPiece;
+
+                Console.Write($"Your King will be in Check");
+                Console.ReadKey();
+                return false;
+            }
             
             // Castle Check
             if (boardPieces[toRow, toCol] is King && Math.Abs(toCol - fromCol) == 2)
@@ -114,10 +125,44 @@ public class Board
         }
         else
         {
+            Console.WriteLine("Incorrect movement");
+            Console.ReadKey();
             return false;
         }
         
         return true;
+    }
+
+    private bool IsCheck(bool isWhite)
+    {
+        int kingRow = 0, kingCol = 0;
+        
+        // König finden
+        for (int i = 0; i < 8; i++)
+        {
+            for (int j = 0; j < 8; j++)
+            {
+                if (boardPieces[i, j] is King && boardPieces[i, j].IsWhite == isWhite)
+                {
+                    kingRow = i;
+                    kingCol = j;
+                }
+            }
+        }
+        
+        // Bei jeder Figuren schauen, ob sie den König schlagen kann
+        for (int fromRow = 0; fromRow < 8; fromRow++)
+        {
+            for (int fromCol = 0; fromCol < 8; fromCol++)
+            {
+                if (boardPieces[fromRow,fromCol].IsWhite != isWhite && boardPieces[fromRow, fromCol].MoveAllowed(fromRow, fromCol, kingRow, kingCol, boardPieces))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
     private void FillBoard()
     {
@@ -143,8 +188,6 @@ public class Board
         boardPieces[7, 0] = new Rook(true);
         boardPieces[7, 7] = new Rook(true);
         
-        /*
-         
         // Knight
         boardPieces[0, 1] = new Knight(false);
         boardPieces[0, 6] = new Knight(false);
@@ -160,8 +203,6 @@ public class Board
         // Queen
         boardPieces[0, 3] = new Queen(false);
         boardPieces[7, 3] = new Queen(true);
-        
-        */
         
         // King
         boardPieces[0, 4] = new King(false);

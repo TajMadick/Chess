@@ -26,14 +26,10 @@ public abstract class Pieces
             // wenn ein Feld auf dem Weg nicht leer ist -> false
             if (boardPieces[fromRow, fromCol] is not Empty)
             {
-                Console.WriteLine("Piece is in the way");
-                Console.ReadKey();
                 return false;
             }
         }
-
-        Console.WriteLine("Incorrect movement");
-        Console.ReadKey();
+        
         return false;
     }
 }
@@ -85,8 +81,6 @@ public class Pawn : Pieces
         
         if (fromCol != toCol)
         {
-            Console.WriteLine("Pawn can only move vertically");
-            Console.ReadKey();
             return false;
         }
         
@@ -110,9 +104,7 @@ public class Pawn : Pieces
                 return true;
             }
         }
-
-        Console.WriteLine("Incorrect movement");
-        Console.ReadKey();
+        
         return false;
     }
     public override char GetIcon()
@@ -136,9 +128,7 @@ public class Knight : Pieces
         {
             return true;
         }
-
-        Console.WriteLine("Incorrect movement");
-        Console.ReadKey();
+        
         return false;
     }
 
@@ -175,7 +165,7 @@ public class Rook : Pieces
         HasMoved = false;
     }
     
-    public bool HasMoved { get; set; }
+    public bool HasMoved { get; private set; }
 
     public override bool MoveAllowed(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
     {
@@ -277,9 +267,7 @@ public class King : Pieces
         {
             return LoopThrough(fromRow, fromCol, toRow, toCol, 0, dirCol, boardPieces);
         }
-
-        Console.WriteLine("Incorrect movement");
-        Console.ReadKey();
+        
         return false;
     }
 
