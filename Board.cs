@@ -6,13 +6,18 @@ public class Board
 {
     private Regex Rg;
     private const string Pattern = "^[a-h][0-8][a-h][0-8]$";
+    private Pieces[,] boardPieces = new Pieces[8,8];
     public Board()
     {
         Rg = new Regex(Pattern);
         FillBoard();
     }
-    
-    private Pieces[,] boardPieces = new Pieces[8,8];
+
+    public struct Tile(int row, int col)
+    {
+        public int Row = row;
+        public int Col = col;
+    }
     
     public void DrawBoard()
     {
@@ -44,31 +49,40 @@ public class Board
         char fromNumber = move[1];
         char toLetter = move[2];
         char toNumber = move[3];
-        
-        int fromRow = 7 - (fromNumber - '1'); 
-        int toRow = 7 - (toNumber - '1'); 
-        
-        int fromCol = fromLetter - 'a';
-        int toCol = toLetter - 'a';
+
+        Tile fromTileCoords = new Tile
+        {
+            Row = 7 - (fromNumber - '1'),
+            Col = fromLetter - 'a'
+        };
+
+        Tile toTileCoords = new Tile
+        {
+            Row = 7 - (toNumber - '1'),
+            Col = toLetter - 'a'
+        };
+
+        ref Pieces fromTile = ref boardPieces[fromTileCoords.Row, fromTileCoords.Col];
+        ref Pieces toTile = ref boardPieces[toTileCoords.Row, toTileCoords.Col];
 
         // Falls versucht leeres Feld zu bewegen
-        if (boardPieces[fromRow, fromCol] is Empty)
+        if (fromTile is Empty)
         {
             Console.Write("From Location is Empty");
             Console.ReadKey();
             return false;
         }
 
-        // Falls versucht auf selbes Feld zu gehen
-        if (fromRow == toRow && fromCol == toCol)
+        // Falls versucht auf selbes Feld zu gehen (selbe Koordinaten)
+        if (fromTileCoords.Row == toTileCoords.Row && fromTileCoords.Col == toTileCoords.Col)
         {
-            Console.Write("From Location ist die selbe als To Location");
+            Console.Write("From Location same as To Location");
             Console.ReadKey();
             return false;
         }
         
         // Falls versucht flasche Farbe zu bewegen
-        if (boardPieces[fromRow, fromCol].IsWhite != isWhiteMoving)
+        if (fromTile.IsWhite != isWhiteMoving)
         {
             string color = (isWhiteMoving) ? "white" : "black";
             Console.Write($"You can only move {color} pieces");
@@ -78,48 +92,72 @@ public class Board
         
         // das Zielfeld darf nicht von der gleichen Farbe sein, 
         // wenn das Zielfeld von der gleichen Farbe ist aber leer dann passts
-        if (boardPieces[toRow, toCol].IsWhite == isWhiteMoving && boardPieces[toRow, toCol] is not Empty)
+        if (toTile.IsWhite == isWhiteMoving && toTile is not Empty)
         {
             Console.Write("Can't take pieces from your own color");
             Console.ReadKey();
             return false;
         }
         
-        if (boardPieces[fromRow,fromCol].MoveAllowed(fromRow, fromCol, toRow, toCol, boardPieces))
+        if (fromTile.MoveAllowed(fromTileCoords.Row, fromTileCoords.Col, toTileCoords.Row, toTileCoords.Col, boardPieces))
         {
-            Pieces oldPiece = boardPieces[toRow, toCol];
-            boardPieces[toRow, toCol] = boardPieces[fromRow, fromCol];
-            boardPieces[fromRow, fromCol] = new Empty();
-
-            if (IsCheck(isWhiteMoving))
+            // Castle Check
+            int diffCol = toTileCoords.Col - fromTileCoords.Col;
+            if (fromTile is King && Math.Abs(diffCol) == 2)
             {
-                boardPieces[fromRow, fromCol] = boardPieces[toRow, toCol];
-                boardPieces[toRow, toCol] = oldPiece;
+                // note bei castling ist fromRow immer toRow
+                int dir = (diffCol > 0) ? 1 : -1;
+                int rookCol = (diffCol > 0) ? 7 : 0;
+
+                // Tiles dazwischen (momentan auch king) checken ob in check und mit toTileCoords.Col+dir auch das Tile wohin King will
+                // TODO für später am anfang col = ...+=dir weil ich will den king check noch machen ob der king anfang des moves schon in check ist
+                for (int col = fromTileCoords.Col; col != (toTileCoords.Col+dir); col += dir)
+                {
+                    if (IsCheck(new Tile(toTileCoords.Row, col), isWhiteMoving))
+                    {
+                        Console.Write("Can't castle! Tiles are in check");
+                        Console.ReadKey();
+                        return false;
+                    }
+                }
+                
+                ref Pieces rookTile = ref boardPieces[fromTileCoords.Row, rookCol];
+
+                // moving rook
+                boardPieces[fromTileCoords.Row, fromTileCoords.Col + dir] = rookTile;
+                rookTile = new Empty();
+                
+                // moving king
+                toTile = fromTile;
+                fromTile = new Empty();
+                
+                return true;
+            }
+            
+            if (fromTile is King king) king.HasMoved = true;
+            if (fromTile is Rook rook) rook.HasMoved = true; 
+            
+            Pieces oldToTile = toTile;
+            toTile = fromTile;
+            fromTile = new Empty();
+
+            // Check if King will be in Check after moving
+            if (IsCheck(FindQueen(isWhiteMoving), isWhiteMoving))
+            {
+                fromTile = toTile;
+                toTile = oldToTile;
 
                 Console.Write($"Your King will be in Check");
                 Console.ReadKey();
                 return false;
             }
-            
-            // Castle Check
-            if (boardPieces[toRow, toCol] is King && Math.Abs(toCol - fromCol) == 2)
-            {
-                int diffCol = toCol - fromCol;
-                int dir = (diffCol > 0) ? 1 : -1;
-                int rookCol = (diffCol > 0) ? 7 : 0;
-
-                // moving rook
-                boardPieces[fromRow, fromCol + dir] = boardPieces[fromRow, rookCol];
-                boardPieces[fromRow, rookCol] = new Empty();
-            }
 
             // Pawn Promotion
-            if (boardPieces[toRow, toCol] is Pawn)
+            if (toTile is Pawn checkPromotablePawn)
             {
-                Pawn checkPromotablePawn = (Pawn)boardPieces[toRow, toCol];
-                if (checkPromotablePawn.IsPromotable(toRow))
+                if (checkPromotablePawn.IsPromotable(toTileCoords.Row))
                 {
-                    boardPieces[toRow, toCol] = new Queen(isWhiteMoving);
+                    toTile = new Queen(isWhiteMoving);
                 }
             }
         }
@@ -133,10 +171,8 @@ public class Board
         return true;
     }
 
-    private bool IsCheck(bool isWhite)
+    Tile FindQueen(bool isWhite)
     {
-        int kingRow = 0, kingCol = 0;
-        
         // König finden
         for (int i = 0; i < 8; i++)
         {
@@ -144,18 +180,22 @@ public class Board
             {
                 if (boardPieces[i, j] is King && boardPieces[i, j].IsWhite == isWhite)
                 {
-                    kingRow = i;
-                    kingCol = j;
+                    return new Tile(i, j);
+
                 }
             }
         }
-        
+
+        return new Tile(0, 0);
+    }
+    private bool IsCheck(Tile toTile, bool isWhite)
+    {
         // Bei jeder Figuren schauen, ob sie den König schlagen kann
         for (int fromRow = 0; fromRow < 8; fromRow++)
         {
             for (int fromCol = 0; fromCol < 8; fromCol++)
             {
-                if (boardPieces[fromRow,fromCol].IsWhite != isWhite && boardPieces[fromRow, fromCol].MoveAllowed(fromRow, fromCol, kingRow, kingCol, boardPieces))
+                if (boardPieces[fromRow,fromCol].IsWhite != isWhite && boardPieces[fromRow, fromCol].MoveAllowed(fromRow, fromCol, toTile.Row, toTile.Col, boardPieces))
                 {
                     return true;
                 }
@@ -175,12 +215,14 @@ public class Board
             }
         }
         
+        /*
         // Pawn
         for (int i = 0; i < 8; i++)
         {
             boardPieces[1, i] = new Pawn(false);
             boardPieces[6, i] = new Pawn(true);
         }
+        */
         
         // Rook
         boardPieces[0, 0] = new Rook(false);
@@ -188,6 +230,7 @@ public class Board
         boardPieces[7, 0] = new Rook(true);
         boardPieces[7, 7] = new Rook(true);
         
+        /*
         // Knight
         boardPieces[0, 1] = new Knight(false);
         boardPieces[0, 6] = new Knight(false);
@@ -199,6 +242,7 @@ public class Board
         boardPieces[0, 5] = new Bishop(false);
         boardPieces[7, 2] = new Bishop(true);
         boardPieces[7, 5] = new Bishop(true);
+        */
         
         // Queen
         boardPieces[0, 3] = new Queen(false);

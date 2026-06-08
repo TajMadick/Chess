@@ -165,7 +165,7 @@ public class Rook : Pieces
         HasMoved = false;
     }
     
-    public bool HasMoved { get; private set; }
+    public bool HasMoved { get; set; }
 
     public override bool MoveAllowed(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
     {
@@ -183,13 +183,9 @@ public class Rook : Pieces
         {
             dirRow = (toRow - fromRow > 0) ? 1 : -1;
         }
-            
-        bool allowed = LoopThrough(fromRow, fromCol, toRow, toCol, dirRow, dirCol, boardPieces);
-        if (allowed) HasMoved = true;
 
-        return allowed;
+        return LoopThrough(fromRow, fromCol, toRow, toCol, dirRow, dirCol, boardPieces);;
     }
-
     public override char GetIcon()
     {
         if (IsWhite) return '♜';
@@ -245,7 +241,7 @@ public class King : Pieces
         HasMoved = false;
     }
     
-    private bool HasMoved { get; set; }
+    public bool HasMoved { get; set; }
 
     public override bool MoveAllowed(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
     {
@@ -259,7 +255,6 @@ public class King : Pieces
 
         if (Math.Abs(diffCol) <= 1 && Math.Abs(diffRow) <= 1)
         {
-            HasMoved = true; 
             return true;
         }
         
@@ -270,7 +265,6 @@ public class King : Pieces
         
         return false;
     }
-
     public override char GetIcon()
     {
         if (IsWhite) return '♚';
