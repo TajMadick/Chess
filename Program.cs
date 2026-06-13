@@ -22,7 +22,7 @@ namespace Schach
                     break;
                 }
                 
-                if (userInput is not null && board.MovePiece(userInput, isWhiteMoving))
+                if (userInput is not null && board.InputMove(userInput, isWhiteMoving))
                 {
                     isWhiteMoving = !isWhiteMoving;
                 }

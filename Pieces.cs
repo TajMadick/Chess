@@ -7,9 +7,18 @@ public abstract class Pieces
         IsWhite = isWhite;
     }
     
+    public enum MoveType
+    {
+        Invalid,
+        Promotion,
+        Castling,
+        Normal,
+        EnPassant
+    }
+    
     public bool IsWhite { get; }
     public abstract char GetIcon();
-    public abstract bool MoveAllowed(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces);
+    public abstract MoveType DetermineMoveType(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces);
 
     protected bool LoopThrough(int fromRow, int fromCol, int toRow, int toCol, int dirRow, int dirCol, Pieces[,] boardPieces)
     {
@@ -43,13 +52,13 @@ public class Pawn : Pieces
 
     private bool IsEnPassantable { get; set; }
 
-    public bool IsPromotable(int row)
+    private bool IsPromotable(int row)
     {
         int end = (IsWhite) ? 0 : 7;
         return row == end;
     }
     
-    public override bool MoveAllowed(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
+    public override MoveType DetermineMoveType(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
     {
         IsEnPassantable = false;
         
@@ -64,48 +73,43 @@ public class Pawn : Pieces
         // Diagonal nehmen -> nur 1 nach links oder rechts, es muss eine Figur dort stehen, es muss das nächste Feld sein
         if (Math.Abs(diffCol) == 1 && boardPieces[toRow, toCol] is not Empty && moveOneField == toRow)
         {
-            return true;
+            if (IsPromotable(toRow)) return MoveType.Promotion;
+            return MoveType.Normal;
         }
         
         // En Passant -> nur 1 nach links oder rechts, muss das nächste Feld sein, das Piece daneben muss ein Bauer sein
-        if (Math.Abs(diffCol) == 1 && moveOneField == toRow && boardPieces[fromRow, fromCol + diffCol] is Pawn)
+        if (Math.Abs(diffCol) == 1 && moveOneField == toRow && boardPieces[fromRow, fromCol + diffCol] is Pawn besidePawn)
         {
             // wenn das Piece daneben EnPassantable is dann bam
-            Pawn besidePawn = (Pawn)boardPieces[fromRow, fromCol + diffCol];
             if (besidePawn.IsEnPassantable)
             {
-                boardPieces[fromRow, fromCol + diffCol] = new Empty();
-                return true;
+                return MoveType.EnPassant;
             }
         }
         
-        if (fromCol != toCol)
-        {
-            return false;
-        }
-        
         // Pawn first move 2 fields
-        if (fromRow == start && moveTwoField == toRow)
+        if (fromRow == start && moveTwoField == toRow && fromCol == toCol)
         {
             // check if nextField and next-nextField is free
             if (boardPieces[moveOneField, fromCol] is Empty && boardPieces[moveTwoField, fromCol] is Empty)
             {
                 IsEnPassantable = true;
-                return true;
+                return MoveType.Normal;
             }
         }
         
         // Pawn normal move
-        if (moveOneField == toRow)
+        if (moveOneField == toRow && fromCol == toCol)
         {
             // check if nextField is free
             if (boardPieces[moveOneField, fromCol] is Empty)
             {
-                return true;
+                if (IsPromotable(toRow)) return MoveType.Promotion;
+                return MoveType.Normal;
             }
         }
         
-        return false;
+        return MoveType.Invalid;
     }
     public override char GetIcon()
     {
@@ -118,7 +122,7 @@ public class Knight : Pieces
 {
     public Knight(bool isWhite) : base(isWhite) { }
 
-    public override bool MoveAllowed(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
+    public override MoveType DetermineMoveType(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
     {
         int diffCol = Math.Abs(toCol - fromCol);
         int diffRow = Math.Abs(toRow - fromRow);
@@ -126,10 +130,10 @@ public class Knight : Pieces
         if (diffCol == 1 && diffRow == 2 ||
             diffCol == 2 && diffRow == 1)
         {
-            return true;
+            return MoveType.Normal;
         }
         
-        return false;
+        return MoveType.Invalid;
     }
 
     public override char GetIcon()
@@ -143,12 +147,19 @@ public class Bishop : Pieces
 {
     public Bishop(bool isWhite) : base(isWhite) { }
 
-    public override bool MoveAllowed(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
+    public override MoveType DetermineMoveType(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
     {
         int dirCol = (toCol - fromCol > 0) ? 1 : -1;
         int dirRow = (toRow - fromRow > 0) ? 1 : -1;
-            
-        return LoopThrough(fromRow, fromCol, toRow, toCol, dirRow, dirCol, boardPieces);
+        
+        if (LoopThrough(fromRow, fromCol, toRow, toCol, dirRow, dirCol, boardPieces))
+        {
+            return MoveType.Normal;
+        }
+        else
+        {
+            return MoveType.Invalid;
+        }
     }
 
     public override char GetIcon()
@@ -167,7 +178,7 @@ public class Rook : Pieces
     
     public bool HasMoved { get; set; }
 
-    public override bool MoveAllowed(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
+    public override MoveType DetermineMoveType(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
     {
         int dirCol = 0, dirRow = 0;
         
@@ -184,7 +195,14 @@ public class Rook : Pieces
             dirRow = (toRow - fromRow > 0) ? 1 : -1;
         }
 
-        return LoopThrough(fromRow, fromCol, toRow, toCol, dirRow, dirCol, boardPieces);;
+        if (LoopThrough(fromRow, fromCol, toRow, toCol, dirRow, dirCol, boardPieces))
+        {
+            return MoveType.Normal;
+        }
+        else
+        {
+            return MoveType.Invalid;
+        }
     }
     public override char GetIcon()
     {
@@ -197,7 +215,7 @@ public class Queen : Pieces
 {
     public Queen(bool isWhite) : base(isWhite) { }
 
-    public override bool MoveAllowed(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
+    public override MoveType DetermineMoveType(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
     {
         int diffCol = Math.Abs(toCol - fromCol);
         int diffRow = Math.Abs(toRow - fromRow);
@@ -208,7 +226,6 @@ public class Queen : Pieces
         if (fromRow == toRow)
         {
             dirCol = (toCol - fromCol > 0) ? 1 : -1;
-
         }
         
         // Queen läuft auf Rows -> Vertikal
@@ -223,8 +240,15 @@ public class Queen : Pieces
             dirCol = (toCol - fromCol > 0) ? 1 : -1;
             dirRow = (toRow - fromRow > 0) ? 1 : -1;
         }
-        
-        return LoopThrough(fromRow, fromCol, toRow, toCol, dirRow, dirCol, boardPieces);
+
+        if (LoopThrough(fromRow, fromCol, toRow, toCol, dirRow, dirCol, boardPieces))
+        {
+            return MoveType.Normal;
+        }
+        else
+        {
+            return MoveType.Invalid;
+        }
     }
 
     public override char GetIcon()
@@ -243,7 +267,7 @@ public class King : Pieces
     
     public bool HasMoved { get; set; }
 
-    public override bool MoveAllowed(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
+    public override MoveType DetermineMoveType(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
     {
         int diffCol = toCol - fromCol;
         int diffRow = toRow - fromRow;
@@ -255,15 +279,18 @@ public class King : Pieces
 
         if (Math.Abs(diffCol) <= 1 && Math.Abs(diffRow) <= 1)
         {
-            return true;
+            return MoveType.Normal;
         }
         
         if (!HasMoved && boardPieces[start, rookCol] is Rook { HasMoved: false })
         {
-            return LoopThrough(fromRow, fromCol, toRow, toCol, 0, dirCol, boardPieces);
+            if (LoopThrough(fromRow, fromCol, toRow, toCol, 0, dirCol, boardPieces))
+            {
+                return MoveType.Castling;
+            }
         }
         
-        return false;
+        return MoveType.Invalid;
     }
     public override char GetIcon()
     {
@@ -275,6 +302,6 @@ public class King : Pieces
 public class Empty : Pieces
 {
     public Empty() : base(false) { }
-    public override bool MoveAllowed(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces) => false;
+    public override MoveType DetermineMoveType(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces) => MoveType.Invalid;
     public override char GetIcon() => ' ';
 }
