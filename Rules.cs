@@ -59,7 +59,6 @@ public static class Rules
 
         return true;
     }
-
     public static void CalculateCoordinates(string move, out int fromRow, out int fromCol, out int toRow, out int toCol)
     {
         char fromLetter = move[0];
@@ -75,19 +74,47 @@ public static class Rules
     }
     public static bool IsCheck(Pieces[,] boardPieces, Board.Tile toTile, bool isWhite)
     {
+        return SearchAttackingPreset(boardPieces, toTile, isWhite, out _, out _);
+    }
+
+    public static int CountAttacking(Pieces[,] boardPieces, Board.Tile toTile, bool isWhite)
+    {
+        SearchAttackingPreset(boardPieces, toTile, isWhite, out int count, out _);
+        return count;
+    }
+    
+    public static Board.Tile GetAttackerTile(Pieces[,] boardPieces, Board.Tile toTile, bool isWhite)
+    {
+        SearchAttackingPreset(boardPieces, toTile, isWhite, out _, out Board.Tile tile);
+        return tile;
+    }
+
+    // Um attacker zu nutzen muss man sicherstellen das count == 1 ist
+    private static bool SearchAttackingPreset(Pieces[,] boardPieces, Board.Tile toTile, bool isWhite, out int count, out Board.Tile attacker)
+    {
+        count = 0;
+        attacker.Row = -1;
+        attacker.Col = -1;
+        
         // Bei jeder Figuren schauen, ob sie den König schlagen kann
         for (int fromRow = 0; fromRow < 8; fromRow++)
         {
             for (int fromCol = 0; fromCol < 8; fromCol++)
             {
+                // sucht nur die gegensätzliche Farbe -> Aufruf von weiß -> sucht nur schwarze Figuren ab
                 if (boardPieces[fromRow,fromCol].IsWhite != isWhite && boardPieces[fromRow, fromCol].DetermineMoveType(fromRow, 
                         fromCol, toTile.Row, toTile.Col, boardPieces) != Pieces.MoveType.Invalid)
                 {
-                    return true;
+                    attacker.Row = fromRow;
+                    attacker.Col = fromCol;
+                    count++;
                 }
             }
         }
 
+        if (count > 0) return true;
         return false;
     }
+    
+    
 }
