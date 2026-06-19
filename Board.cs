@@ -147,45 +147,6 @@ public class Board
 
         return new Tile(0, 0);
     }
-    
-    public bool IsCheckmate(Board.Tile kingPos, bool isWhiteMoving)
-    {
-        int kingRow = kingPos.Row;
-        int kingCol = kingPos.Col;
-        // first Check if King can escape
-        // TODO später eine Funktion allowed moves schreiben die alle erlaubten Züge zurück gibt
-        for (int i = kingRow - 1; i is >= 0 and < 8 && i <= kingRow + 1; i++)
-        {
-            for (int j = kingCol - 1; j is >= 0 and < 8 && j <= kingCol + 1; j++)
-            {
-                // wenn das Ziel nicht gleich ist wie der Start
-                // und der Zug ein normaler Zug ist 
-                // und dieser Zug nicht den King wieder Matt setzt
-                // dann ist es kein Schachmatt
-                if (i != kingRow && j != kingCol && boardPieces[kingRow, kingCol].DetermineMoveType(kingRow, kingCol,
-                        i, j, boardPieces) == Pieces.MoveType.Normal && !Rules.IsCheck(boardPieces, new Board.Tile(i,j), isWhiteMoving))
-                {
-                    return false;
-                }
-            }
-        }
-
-        // wenn nur ein Angreifer ist und der Konig nicht wegmoven kann ist es NOCH kein Schachmatt
-        if (Rules.CountAttacking(boardPieces, kingPos, isWhiteMoving) == 1)
-        {
-            Tile attackerTile = Rules.GetAttackerTile(boardPieces, kingPos, isWhiteMoving);
-            
-            // kann der Angreifer geschlagen werden
-            // isWhiteMoving negieren da man schauen muss welche von den eigenen Figuren den Angreifer schlägt
-            // IsCheck prüft nur die gegnerischen Figuren
-            if (Rules.IsCheck(boardPieces, attackerTile, !isWhiteMoving))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
 
     private bool MovePiece(ref Pieces fromTile, ref Pieces toTile, bool isWhiteMoving)
     {

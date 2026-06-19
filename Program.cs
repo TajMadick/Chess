@@ -1,4 +1,5 @@
 ﻿using System;
+
 namespace Schach
 {
     class Programm

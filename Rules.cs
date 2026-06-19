@@ -72,29 +72,74 @@ public static class Rules
         toRow = 7 - (toNumber - '1');
         toCol = toLetter - 'a';
     }
+    
+    public static bool IsCheckmate(Pieces[,] boardPieces, Board.Tile kingPos, bool isWhiteMoving)
+    {
+        int kingRow = kingPos.Row;
+        int kingCol = kingPos.Col;
+        
+        // als Erstes prüfen, ob König abhauen kann
+        // durch alle legalen Züge des Königs durchgehen -> wenn er irgendwo nicht Check ist dann kein Schachmatt
+        foreach (Board.Tile allowedMove in boardPieces[kingRow, kingCol].AllLegalMoves(kingRow, kingCol, boardPieces))
+        {
+            if (!Rules.IsCheck(boardPieces, allowedMove, isWhiteMoving))
+            {
+                return false;
+            }
+        }
+
+        // wenn nur ein Angreifer ist und der König sich nicht bewegen kann ist es NOCH kein Schachmatt
+        if (CountAttacking(boardPieces, kingPos, isWhiteMoving) == 1)
+        {
+            Board.Tile attackerTile = GetAttackerTile(boardPieces, kingPos, isWhiteMoving);
+            ref Pieces attacker = ref boardPieces[attackerTile.Row, attackerTile.Col];
+            
+            // kann der Angreifer geschlagen werden
+            // isWhiteMoving negieren da man schauen muss welche von den eigenen Figuren den Angreifer schlägt
+            // IsCheck prüft nur die gegnerischen Figuren
+            if (IsCheck(boardPieces, attackerTile, !isWhiteMoving))
+            {
+                return false;
+            }
+            
+            // letzte Prüfung kann Spieler eine Figur dazwischen bewegen 
+            // und angreifende Figur muss ein Springer, Turm oder Dame sein
+            if (boardPieces[attackerTile.Row, attackerTile.Col] is Bishop or Rook or Queen)
+            {
+                foreach (Board.Tile tile in attacker.FieldsOnPath(attackerTile.Row, attackerTile.Col, kingRow, kingCol,
+                             boardPieces))
+                {
+                    if (IsCheck(boardPieces, tile, !isWhiteMoving))
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        // Schachmatt
+        return true;
+    }
     public static bool IsCheck(Pieces[,] boardPieces, Board.Tile toTile, bool isWhite)
     {
-        return SearchAttackingPreset(boardPieces, toTile, isWhite, out _, out _);
+        return SearchAttackingPreset(boardPieces, toTile, isWhite).Any();
     }
 
+    // kann man nur benutzen, wenn man geprüft hat IsCheck !!!
     public static int CountAttacking(Pieces[,] boardPieces, Board.Tile toTile, bool isWhite)
     {
-        SearchAttackingPreset(boardPieces, toTile, isWhite, out int count, out _);
-        return count;
+        return SearchAttackingPreset(boardPieces, toTile, isWhite).Last().count;
     }
     
+    // kann man nur benutzen, wenn Count Attacking == 2!!!
     public static Board.Tile GetAttackerTile(Pieces[,] boardPieces, Board.Tile toTile, bool isWhite)
     {
-        SearchAttackingPreset(boardPieces, toTile, isWhite, out _, out Board.Tile tile);
-        return tile;
+        return SearchAttackingPreset(boardPieces, toTile, isWhite).First().attacker;
     }
-
-    // Um attacker zu nutzen muss man sicherstellen das count == 1 ist
-    private static bool SearchAttackingPreset(Pieces[,] boardPieces, Board.Tile toTile, bool isWhite, out int count, out Board.Tile attacker)
+    
+    private static IEnumerable<(int count, Board.Tile attacker)> SearchAttackingPreset(Pieces[,] boardPieces, Board.Tile toTile, bool isWhite)
     {
-        count = 0;
-        attacker.Row = -1;
-        attacker.Col = -1;
+        int count = 0;
         
         // Bei jeder Figuren schauen, ob sie den König schlagen kann
         for (int fromRow = 0; fromRow < 8; fromRow++)
@@ -105,15 +150,11 @@ public static class Rules
                 if (boardPieces[fromRow,fromCol].IsWhite != isWhite && boardPieces[fromRow, fromCol].DetermineMoveType(fromRow, 
                         fromCol, toTile.Row, toTile.Col, boardPieces) != Pieces.MoveType.Invalid)
                 {
-                    attacker.Row = fromRow;
-                    attacker.Col = fromCol;
                     count++;
+                    yield return (count, new Board.Tile(fromRow, fromCol));
                 }
             }
         }
-
-        if (count > 0) return true;
-        return false;
     }
     
     
