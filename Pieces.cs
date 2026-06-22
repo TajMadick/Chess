@@ -18,41 +18,45 @@ public abstract class Pieces
     
     public bool IsWhite { get; }
     public abstract char GetIcon();
-    public abstract MoveType DetermineMoveType(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces);
 
-    public abstract IEnumerable<Board.Tile> FieldsOnPath(int fromRow, int fromCol, int toRow, int toCol,
-        Pieces[,] boardPieces);
+    public abstract Pieces Copy();
+    public abstract MoveType DetermineMoveType(Board board, Board.Tile fromTile, Board.Tile toTile);
 
-    public IEnumerable<Board.Tile> AllLegalMoves(int fromRow, int fromCol, Pieces[,] boardPieces)
+    public abstract IEnumerable<Board.Tile> FieldsOnPath(Board board, Board.Tile fromTile, Board.Tile toTile);
+
+    public IEnumerable<Board.Tile> AllLegalMoves(Board board, Board.Tile fromTile)
     {
-        for (int toRow = 0; toRow < 8; toRow++)
+        for (int row = 0; row < 8; row++)
         {
-            for (int toCol = 0; toCol < 8; toCol++)
+            for (int col = 0; col < 8; col++)
             {
-                if (fromRow != toRow && fromCol != toCol &&
-                    boardPieces[fromRow, fromCol].DetermineMoveType(fromRow, fromCol, toRow, toCol, boardPieces) !=
-                    MoveType.Invalid)
+                Board.Tile toTile = new Board.Tile(row, col);
+                
+                if (fromTile != toTile &&
+                    board[fromTile].DetermineMoveType(board, fromTile, toTile) != MoveType.Invalid)
                 {
-                    yield return new Board.Tile(toRow, toCol);
+                    yield return toTile;
                 }
             }
         }
     }
 
-    protected bool LoopThrough(int fromRow, int fromCol, int toRow, int toCol, int dirRow, int dirCol, Pieces[,] boardPieces)
+    protected bool LoopThrough(Board board, Board.Tile fromTile, Board.Tile toTile, int dirRow, int dirCol)
     {
-        fromRow += dirRow;
-        fromCol += dirCol;
-        for (; fromRow is >= 0 and < 8 && fromCol is >= 0 and < 8; fromRow += dirRow, fromCol += dirCol)
+        int row = fromTile.Row += dirRow;
+        int col = fromTile.Col += dirCol;
+        
+        for (; row is >= 0 and < 8 && col is >= 0 and < 8; row += dirRow, col += dirCol)
         {
+            Board.Tile runnerTile = new Board.Tile(row, col);
             // wenn die Runner es bis zum Ziel geschafft haben -> true
-            if (fromCol == toCol && fromRow == toRow)
+            if (runnerTile == toTile)
             {
                 return true;
             }
 
             // wenn ein Feld auf dem Weg nicht leer ist -> false
-            if (boardPieces[fromRow, fromCol] is not Empty)
+            if (board[runnerTile] is not Empty)
             {
                 return false;
             }
@@ -62,18 +66,21 @@ public abstract class Pieces
     }
 
     // TODO: das alles schöner machen das momentan schiach
-    protected bool IsFieldOnPath(int fromRow, int fromCol, int targetRow, int targetCol, int toRow, int toCol, int dirRow,
-        int dirCol, Pieces[,] boardPieces)
+    protected bool IsFieldOnPath(Board board, Board.Tile fromTile, Board.Tile targetTile, Board.Tile toTile, int dirRow, int dirCol)
     {
-        int lowerBoundRow = (fromRow < toRow) ? toRow : -1;
-        int upperBoundRow = (fromRow < toRow) ? 8 : toRow;
-        int lowerBoundCol = (fromCol < toCol) ? toCol : -1;
-        int upperBoundCol = (fromCol < toCol) ? 8 : toCol;
+        int lowerBoundRow = (fromTile.Row < toTile.Row) ? toTile.Row : -1;
+        int upperBoundRow = (fromTile.Row < toTile.Row) ? 8 : toTile.Row;
+        int lowerBoundCol = (fromTile.Col < toTile.Col) ? toTile.Col : -1;
+        int upperBoundCol = (fromTile.Col < toTile.Col) ? 8 : toTile.Col;
+
+        int row = fromTile.Row;
+        int col = fromTile.Col;
         
-        for (; fromRow > lowerBoundRow && fromRow < upperBoundRow && fromCol > lowerBoundCol && fromCol < upperBoundCol; 
-             fromRow += dirRow, fromCol += dirCol)
+        for (; row > lowerBoundRow && row < upperBoundRow && col > lowerBoundCol && col < upperBoundCol; 
+             row += dirRow, col += dirCol)
         {
-            if (fromRow == targetRow && fromCol == targetCol)
+            Board.Tile runnerTile = new Board.Tile(row, col);
+            if (runnerTile == targetTile)
             {
                 return true;
             }
@@ -90,7 +97,12 @@ public class Pawn : Pieces
         IsEnPassantable = false;
     }
 
-    private bool IsEnPassantable { get; set; }
+    public override Pieces Copy()
+    {
+        return new Pawn(IsWhite) { IsEnPassantable = IsEnPassantable };
+    }
+    
+    public bool IsEnPassantable { get; set; }
 
     private bool IsPromotable(int row)
     {
@@ -98,32 +110,32 @@ public class Pawn : Pieces
         return row == end;
     }
 
-    public override IEnumerable<Board.Tile> FieldsOnPath(int fromRow, int fromCol, int toRow, int toCol,
-        Pieces[,] boardPieces)
+    public override IEnumerable<Board.Tile> FieldsOnPath(Board board, Board.Tile fromTile, Board.Tile toTile)
     {
-        yield return new Board.Tile(0, 0);}
+        yield return new Board.Tile(0, 0);
+    }
     
-    public override MoveType DetermineMoveType(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
+    public override MoveType DetermineMoveType(Board board,Board.Tile fromTile, Board.Tile toTile)
     {
         IsEnPassantable = false;
         
         int start = (IsWhite) ? 6 : 1;
         int dir = (IsWhite) ? 1 : -1;
 
-        int moveTwoField = fromRow - 2 * dir;
-        int moveOneField = fromRow - 1 * dir;
+        int moveTwoField = fromTile.Row - 2 * dir;
+        int moveOneField = fromTile.Row - 1 * dir;
 
-        int diffCol = toCol - fromCol;
+        int diffCol = toTile.Col - fromTile.Col;
 
         // Diagonal nehmen -> nur 1 nach links oder rechts, es muss eine Figur dort stehen, es muss das nächste Feld sein
-        if (Math.Abs(diffCol) == 1 && boardPieces[toRow, toCol] is not Empty && moveOneField == toRow)
+        if (Math.Abs(diffCol) == 1 && board[toTile] is not Empty && moveOneField == toTile.Row)
         {
-            if (IsPromotable(toRow)) return MoveType.Promotion;
+            if (IsPromotable(toTile.Row)) return MoveType.Promotion;
             return MoveType.Normal;
         }
         
         // En Passant -> nur 1 nach links oder rechts, muss das nächste Feld sein, das Piece daneben muss ein Bauer sein
-        if (Math.Abs(diffCol) == 1 && moveOneField == toRow && boardPieces[fromRow, fromCol + diffCol] is Pawn besidePawn)
+        if (Math.Abs(diffCol) == 1 && moveOneField == toTile.Row && board[fromTile.Row, fromTile.Col + diffCol] is Pawn besidePawn)
         {
             // wenn das Piece daneben EnPassantable is dann bam
             if (besidePawn.IsEnPassantable)
@@ -133,10 +145,10 @@ public class Pawn : Pieces
         }
         
         // Pawn first move 2 fields
-        if (fromRow == start && moveTwoField == toRow && fromCol == toCol)
+        if (fromTile.Row == start && moveTwoField == toTile.Row && fromTile.Col == toTile.Col)
         {
             // check if nextField and next-nextField is free
-            if (boardPieces[moveOneField, fromCol] is Empty && boardPieces[moveTwoField, fromCol] is Empty)
+            if (board[moveOneField, fromTile.Col] is Empty && board[moveTwoField, fromTile.Col] is Empty)
             {
                 IsEnPassantable = true;
                 return MoveType.Normal;
@@ -144,12 +156,12 @@ public class Pawn : Pieces
         }
         
         // Pawn normal move
-        if (moveOneField == toRow && fromCol == toCol)
+        if (moveOneField == toTile.Row && fromTile.Col == toTile.Col)
         {
             // check if nextField is free
-            if (boardPieces[moveOneField, fromCol] is Empty)
+            if (board[moveOneField, fromTile.Col] is Empty)
             {
-                if (IsPromotable(toRow)) return MoveType.Promotion;
+                if (IsPromotable(toTile.Row)) return MoveType.Promotion;
                 return MoveType.Normal;
             }
         }
@@ -167,15 +179,19 @@ public class Knight : Pieces
 {
     public Knight(bool isWhite) : base(isWhite) { }
     
-    public override IEnumerable<Board.Tile> FieldsOnPath(int fromRow, int fromCol, int toRow, int toCol,
-        Pieces[,] boardPieces)
+    public override Pieces Copy()
+    {
+        return new Knight(IsWhite);
+    }
+    
+    public override IEnumerable<Board.Tile> FieldsOnPath(Board board, Board.Tile fromTile, Board.Tile toTile)
     {
         yield return new Board.Tile(0, 0);}
 
-    public override MoveType DetermineMoveType(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
+    public override MoveType DetermineMoveType(Board board, Board.Tile fromTile, Board.Tile toTile)
     {
-        int diffCol = Math.Abs(toCol - fromCol);
-        int diffRow = Math.Abs(toRow - fromRow);
+        int diffCol = Math.Abs(toTile.Col - fromTile.Col);
+        int diffRow = Math.Abs(toTile.Row - fromTile.Row);
 
         if (diffCol == 1 && diffRow == 2 ||
             diffCol == 2 && diffRow == 1)
@@ -197,12 +213,17 @@ public class Bishop : Pieces
 {
     public Bishop(bool isWhite) : base(isWhite) { }
 
-    public override MoveType DetermineMoveType(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
+    public override Pieces Copy()
     {
-        int dirCol = (toCol - fromCol > 0) ? 1 : -1;
-        int dirRow = (toRow - fromRow > 0) ? 1 : -1;
+        return new Bishop(IsWhite);
+    }
+    
+    public override MoveType DetermineMoveType(Board board, Board.Tile fromTile, Board.Tile toTile)
+    {
+        int dirCol = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
+        int dirRow = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
         
-        if (LoopThrough(fromRow, fromCol, toRow, toCol, dirRow, dirCol, boardPieces))
+        if (LoopThrough(board, fromTile, toTile, dirRow, dirCol))
         {
             return MoveType.Normal;
         }
@@ -212,14 +233,14 @@ public class Bishop : Pieces
         }
     }
 
-    public override IEnumerable<Board.Tile> FieldsOnPath(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
+    public override IEnumerable<Board.Tile> FieldsOnPath(Board board, Board.Tile fromTile, Board.Tile toTile)
     {
-        int dirCol = (toCol - fromCol > 0) ? 1 : -1;
-        int dirRow = (toRow - fromRow > 0) ? 1 : -1;
+        int dirCol = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
+        int dirRow = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
         
-        foreach (Board.Tile tile in boardPieces[fromRow,fromCol].AllLegalMoves(fromRow, fromCol, boardPieces))
+        foreach (Board.Tile tile in board[fromTile].AllLegalMoves(board, fromTile))
         {
-            if (IsFieldOnPath(fromRow, fromCol, tile.Row, tile.Col, toRow, toCol, dirRow, dirCol, boardPieces))
+            if (IsFieldOnPath(board, fromTile, tile, toTile, dirRow, dirCol))
             {
                 yield return tile;
             }
@@ -237,29 +258,34 @@ public class Rook : Pieces
 {
     public Rook(bool isWhite) : base(isWhite)
     {
-        HasMoved = false;
+        HasMoved = true;
+    }
+    
+    public override Pieces Copy()
+    {
+        return new Rook(IsWhite) {HasMoved = HasMoved};
     }
     
     public bool HasMoved { get; set; }
 
-    public override MoveType DetermineMoveType(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
+    public override MoveType DetermineMoveType(Board board, Board.Tile fromTile, Board.Tile toTile)
     {
         int dirCol = 0, dirRow = 0;
         
         // Rook läuft auf Cols -> Horizontal
-        if (fromRow == toRow)
+        if (fromTile.Row == toTile.Row)
         {
-            dirCol = (toCol - fromCol > 0) ? 1 : -1;
+            dirCol = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
 
         }
         
         // Rook läuft auf Rows -> Vertikal
-        if (fromCol == toCol)
+        if (fromTile.Col == toTile.Col)
         {
-            dirRow = (toRow - fromRow > 0) ? 1 : -1;
+            dirRow = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
         }
 
-        if (LoopThrough(fromRow, fromCol, toRow, toCol, dirRow, dirCol, boardPieces))
+        if (LoopThrough(board, fromTile, toTile, dirRow, dirCol))
         {
             return MoveType.Normal;
         }
@@ -269,26 +295,26 @@ public class Rook : Pieces
         }
     }
     
-    public override IEnumerable<Board.Tile> FieldsOnPath(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
+    public override IEnumerable<Board.Tile> FieldsOnPath(Board board, Board.Tile fromTile, Board.Tile toTile)
     {
         int dirCol = 0, dirRow = 0;
         
         // Rook läuft auf Cols -> Horizontal
-        if (fromRow == toRow)
+        if (fromTile.Row == toTile.Row)
         {
-            dirCol = (toCol - fromCol > 0) ? 1 : -1;
+            dirCol = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
 
         }
         
         // Rook läuft auf Rows -> Vertikal
-        if (fromCol == toCol)
+        if (fromTile.Col == toTile.Col)
         {
-            dirRow = (toRow - fromRow > 0) ? 1 : -1;
+            dirRow = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
         }
         
-        foreach (Board.Tile tile in boardPieces[fromRow,fromCol].AllLegalMoves(fromRow, fromCol, boardPieces))
+        foreach (Board.Tile tile in board[fromTile].AllLegalMoves(board, fromTile))
         {
-            if (IsFieldOnPath(fromRow, fromCol, tile.Row, tile.Col, toRow, toCol, dirRow, dirCol, boardPieces))
+            if (IsFieldOnPath(board, fromTile, tile, toTile, dirRow, dirCol))
             {
                 yield return tile;
             }
@@ -305,33 +331,38 @@ public class Queen : Pieces
 {
     public Queen(bool isWhite) : base(isWhite) { }
 
-    public override MoveType DetermineMoveType(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
+    public override Pieces Copy()
     {
-        int diffCol = Math.Abs(toCol - fromCol);
-        int diffRow = Math.Abs(toRow - fromRow);
+        return new Queen(IsWhite);
+    }
+
+    public override MoveType DetermineMoveType(Board board, Board.Tile fromTile, Board.Tile toTile)
+    {
+        int diffCol = Math.Abs(toTile.Col - fromTile.Col);
+        int diffRow = Math.Abs(toTile.Row - fromTile.Row);
         
         int dirCol = 0, dirRow = 0;
         
         // Queen läuft auf Cols -> Horizontal
-        if (fromRow == toRow)
+        if (fromTile.Row == toTile.Row)
         {
-            dirCol = (toCol - fromCol > 0) ? 1 : -1;
+            dirCol = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
         }
         
         // Queen läuft auf Rows -> Vertikal
-        if (fromCol == toCol)
+        if (fromTile.Col == toTile.Col)
         {
-            dirRow = (toRow - fromRow > 0) ? 1 : -1;
+            dirRow = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
         }
 
         // Queen läuft diagonal
         if (diffCol == diffRow)
         {
-            dirCol = (toCol - fromCol > 0) ? 1 : -1;
-            dirRow = (toRow - fromRow > 0) ? 1 : -1;
+            dirCol = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
+            dirRow = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
         }
 
-        if (LoopThrough(fromRow, fromCol, toRow, toCol, dirRow, dirCol, boardPieces))
+        if (LoopThrough(board, fromTile, toTile, dirRow, dirCol))
         {
             return MoveType.Normal;
         }
@@ -341,35 +372,35 @@ public class Queen : Pieces
         }
     }
     
-    public override IEnumerable<Board.Tile> FieldsOnPath(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
+    public override IEnumerable<Board.Tile> FieldsOnPath(Board board, Board.Tile fromTile, Board.Tile toTile)
     {
-        int diffCol = Math.Abs(toCol - fromCol);
-        int diffRow = Math.Abs(toRow - fromRow);
+        int diffCol = Math.Abs(toTile.Col - fromTile.Col);
+        int diffRow = Math.Abs(toTile.Row - fromTile.Row);
         
         int dirCol = 0, dirRow = 0;
         
         // Queen läuft auf Cols -> Horizontal
-        if (fromRow == toRow)
+        if (fromTile.Row == toTile.Row)
         {
-            dirCol = (toCol - fromCol > 0) ? 1 : -1;
+            dirCol = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
         }
         
         // Queen läuft auf Rows -> Vertikal
-        if (fromCol == toCol)
+        if (fromTile.Col == toTile.Col)
         {
-            dirRow = (toRow - fromRow > 0) ? 1 : -1;
+            dirRow = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
         }
 
         // Queen läuft diagonal
         if (diffCol == diffRow)
         {
-            dirCol = (toCol - fromCol > 0) ? 1 : -1;
-            dirRow = (toRow - fromRow > 0) ? 1 : -1;
+            dirCol = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
+            dirRow = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
         }
         
-        foreach (Board.Tile tile in boardPieces[fromRow,fromCol].AllLegalMoves(fromRow, fromCol, boardPieces))
+        foreach (Board.Tile tile in board[fromTile].AllLegalMoves(board, fromTile))
         {
-            if (IsFieldOnPath(fromRow, fromCol, tile.Row, tile.Col, toRow, toCol, dirRow, dirCol, boardPieces))
+            if (IsFieldOnPath(board, fromTile, tile, toTile, dirRow, dirCol))
             {
                 yield return tile;
             }
@@ -390,17 +421,21 @@ public class King : Pieces
         HasMoved = false;
     }
     
+    public override Pieces Copy()
+    {
+        return new King(IsWhite) {HasMoved = HasMoved};
+    }
+    
     public bool HasMoved { get; set; }
     
-    public override IEnumerable<Board.Tile> FieldsOnPath(int fromRow, int fromCol, int toRow, int toCol,
-        Pieces[,] boardPieces)
+    public override IEnumerable<Board.Tile> FieldsOnPath(Board board, Board.Tile fromTile, Board.Tile toTile)
     {
         yield return new Board.Tile(0, 0);}
 
-    public override MoveType DetermineMoveType(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces)
+    public override MoveType DetermineMoveType(Board board, Board.Tile fromTile, Board.Tile toTile)
     {
-        int diffCol = toCol - fromCol;
-        int diffRow = toRow - fromRow;
+        int diffCol = toTile.Col - fromTile.Col;
+        int diffRow = toTile.Row - fromTile.Row;
         
         int start = (IsWhite) ? 7 : 0;
 
@@ -412,9 +447,9 @@ public class King : Pieces
             return MoveType.Normal;
         }
         
-        if (!HasMoved && boardPieces[start, rookCol] is Rook { HasMoved: false })
+        if (!HasMoved && board[start, rookCol] is Rook { HasMoved: false })
         {
-            if (LoopThrough(fromRow, fromCol, toRow, toCol, 0, dirCol, boardPieces))
+            if (LoopThrough(board, fromTile, toTile, 0, dirCol))
             {
                 return MoveType.Castling;
             }
@@ -433,10 +468,14 @@ public class Empty : Pieces
 {
     public Empty() : base(false) { }
     
-    public override IEnumerable<Board.Tile> FieldsOnPath(int fromRow, int fromCol, int toRow, int toCol,
-        Pieces[,] boardPieces)
+    public override Pieces Copy()
+    {
+        return new Empty();
+    }
+    
+    public override IEnumerable<Board.Tile> FieldsOnPath(Board board, Board.Tile fromTile, Board.Tile toTile)
     {
         yield return new Board.Tile(0, 0);}
-    public override MoveType DetermineMoveType(int fromRow, int fromCol, int toRow, int toCol, Pieces[,] boardPieces) => MoveType.Invalid;
+    public override MoveType DetermineMoveType(Board board, Board.Tile fromTile, Board.Tile toTile) => MoveType.Invalid;
     public override char GetIcon() => ' ';
 }

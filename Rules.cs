@@ -7,7 +7,7 @@ public static class Rules
     private static Regex Rg;
     private const string Pattern = "^[a-h][0-8][a-h][0-8]$";
     
-    public static bool PassesSanityChecks(string move, Pieces[,] boardPieces, bool isWhiteMoving)
+    public static bool PassesSanityChecks(Board board, string move, bool isWhiteMoving)
     {
         Rg = new Regex(Pattern);
         
@@ -18,13 +18,13 @@ public static class Rules
             return false;
         }
 
-        CalculateCoordinates(move, out int fromRow, out int fromCol, out int toRow, out int toCol);
+        CalculateCoordinates(move, out Board.Tile fromTile, out Board.Tile toTile);
 
-        ref Pieces fromTile = ref boardPieces[fromRow, fromCol];
-        ref Pieces toTile = ref boardPieces[toRow, toCol];
+        ref Pieces fromPiece = ref board.GetRef(fromTile);
+        ref Pieces toPiece = ref board.GetRef(toTile);
         
         // Falls versucht leeres Feld zu bewegen
-        if (fromTile is Empty)
+        if (fromPiece is Empty)
         {
             Console.Write("From Location is Empty");
             Console.ReadKey();
@@ -32,7 +32,7 @@ public static class Rules
         }
 
         // Falls versucht auf selbes Feld zu gehen (selbe Koordinaten)
-        if (fromRow == toRow && fromCol == toCol)
+        if (fromTile == toTile)
         {
             Console.Write("From Location same as To Location");
             Console.ReadKey();
@@ -40,7 +40,7 @@ public static class Rules
         }
         
         // Falls versucht flasche Farbe zu bewegen
-        if (fromTile.IsWhite != isWhiteMoving)
+        if (fromPiece.IsWhite != isWhiteMoving)
         {
             string color = (isWhiteMoving) ? "white" : "black";
             Console.Write($"You can only move {color} pieces");
@@ -48,9 +48,8 @@ public static class Rules
             return false;
         }
         
-        // das Zielfeld darf nicht von der gleichen Farbe sein, 
-        // wenn das Zielfeld von der gleichen Farbe ist aber leer dann passts
-        if (toTile.IsWhite == isWhiteMoving && toTile is not Empty)
+
+        if (IsOwnPiece(ref toPiece, isWhiteMoving))
         {
             Console.Write("Can't take pieces from your own color");
             Console.ReadKey();
@@ -59,59 +58,106 @@ public static class Rules
 
         return true;
     }
-    public static void CalculateCoordinates(string move, out int fromRow, out int fromCol, out int toRow, out int toCol)
+        
+    
+    // das Zielfeld darf nicht von der gleichen Farbe sein, 
+    // wenn das Zielfeld von der gleichen Farbe ist aber leer dann passts
+    public static bool IsOwnPiece(ref Pieces tile, bool isWhiteMoving) =>
+        tile.IsWhite == isWhiteMoving && tile is not Empty;
+    public static void CalculateCoordinates(string move, out Board.Tile fromTile, out Board.Tile toTile)
     {
         char fromLetter = move[0];
         char fromNumber = move[1];
         char toLetter = move[2];
         char toNumber = move[3];
 
-        fromRow = 7 - (fromNumber - '1');
-        fromCol = fromLetter - 'a';
+        fromTile = new Board.Tile(7 - (fromNumber - '1'), fromLetter - 'a');
+        toTile = new Board.Tile(7 - (toNumber - '1'), toLetter - 'a');
+    }
 
-        toRow = 7 - (toNumber - '1');
-        toCol = toLetter - 'a';
+    public static Board TemporaryMove(Board board, Board.Tile fromTile, Board.Tile toTile)
+    {
+        Board temporaryBoard = new Board(board);
+        temporaryBoard[toTile] = temporaryBoard[fromTile];
+        temporaryBoard[fromTile] = new Empty();
+        return temporaryBoard;
     }
     
-    public static bool IsCheckmate(Pieces[,] boardPieces, Board.Tile kingPos, bool isWhiteMoving)
+    public static bool IsCheckmate(Board board, Board.Tile kingTile, bool isWhiteMoving)
     {
-        int kingRow = kingPos.Row;
-        int kingCol = kingPos.Col;
-        
         // als Erstes prüfen, ob König abhauen kann
         // durch alle legalen Züge des Königs durchgehen -> wenn er irgendwo nicht Check ist dann kein Schachmatt
-        foreach (Board.Tile allowedMove in boardPieces[kingRow, kingCol].AllLegalMoves(kingRow, kingCol, boardPieces))
+        foreach (Board.Tile allowedTile in board[kingTile].AllLegalMoves(board, kingTile))
         {
-            if (!Rules.IsCheck(boardPieces, allowedMove, isWhiteMoving))
+            Board temporaryBoard = TemporaryMove(board, kingTile, allowedTile);
+            if (!IsOwnPiece(ref board.GetRef(allowedTile), isWhiteMoving) && 
+                !Rules.IsCheck(temporaryBoard, allowedTile, isWhiteMoving))
             {
                 return false;
             }
         }
 
         // wenn nur ein Angreifer ist und der König sich nicht bewegen kann ist es NOCH kein Schachmatt
-        if (CountAttacking(boardPieces, kingPos, isWhiteMoving) == 1)
+        if (CountAttacking(board, kingTile, isWhiteMoving) == 1)
         {
-            Board.Tile attackerTile = GetAttackerTile(boardPieces, kingPos, isWhiteMoving);
-            ref Pieces attacker = ref boardPieces[attackerTile.Row, attackerTile.Col];
+            Board.Tile attackerTile = GetAttackerTile(board, kingTile, isWhiteMoving);
+            ref Pieces attacker = ref board.GetRef(attackerTile);
             
             // kann der Angreifer geschlagen werden
-            // isWhiteMoving negieren da man schauen muss welche von den eigenen Figuren den Angreifer schlägt
-            // IsCheck prüft nur die gegnerischen Figuren
-            if (IsCheck(boardPieces, attackerTile, !isWhiteMoving))
+            if (IsCheck(board, attackerTile, !isWhiteMoving)) // isWhiteMoving = true er schaut, ob weiß geschlagen werden kann bei diesem Feld
+                                                              // wir wollen aber genau umgekehrt schauen kann der Angreifer geschlagen werden
             {
-                return false;
+                foreach (Board.Tile defenderTile in GetAllAttackerTiles(board, attackerTile, !isWhiteMoving))
+                {
+                    // wenn Verteidiger König ist schauen, ob er beim Verteidigen nicht ins Schach kommt
+                    if (board[defenderTile] is King)
+                    {
+                        // temporäres Feld machen und mit König verteidigen
+                        // König geht zur Angreifer Position und schauen ob er da in Check ist
+                        Board temporaryBoard = TemporaryMove(board, kingTile, attackerTile);
+                        if (!IsCheck(temporaryBoard, attackerTile, isWhiteMoving))
+                        {
+                            return false;
+                        }
+                    }
+                    // Verteidiger ist nicht der König
+                    else
+                    {
+                        // temporäres Feld machen und mit der Figur verteidigen
+                        // wenn König danach nicht Schach ist kein Schachmatt
+                        Board temporaryBoard = TemporaryMove(board, defenderTile, attackerTile);
+                        if (!IsCheck(temporaryBoard, kingTile, isWhiteMoving))
+                        {
+                            return false;
+                        }
+                    }
+                }
             }
             
             // letzte Prüfung kann Spieler eine Figur dazwischen bewegen 
             // und angreifende Figur muss ein Springer, Turm oder Dame sein
-            if (boardPieces[attackerTile.Row, attackerTile.Col] is Bishop or Rook or Queen)
+            if (attacker is Bishop or Rook or Queen)
             {
-                foreach (Board.Tile tile in attacker.FieldsOnPath(attackerTile.Row, attackerTile.Col, kingRow, kingCol,
-                             boardPieces))
+                // alle Tiles zwischen König und Angreifer durchgehen
+                foreach (Board.Tile tile in attacker.FieldsOnPath(board, attackerTile, kingTile))
                 {
-                    if (IsCheck(boardPieces, tile, !isWhiteMoving))
+                    // kann einer der verteidigenden Figuren auf dieses Tile gehen
+                    if (IsCheck(board, tile, !isWhiteMoving))
                     {
-                        return false;
+                        // durch alle Verteidiger durchgehen
+                        foreach (Board.Tile defenderTile in GetAllAttackerTiles(board, attackerTile, !isWhiteMoving))
+                        {
+                            // wenn dieser Verteidiger nicht der König ist TODO: das muss ich noch durchüberlegen ob ich das brauche
+                            if (board[defenderTile] is not King)
+                            {
+                                // wenn König danach nicht Schach ist kein Schachmatt
+                                Board temporaryBoard = TemporaryMove(board, defenderTile, attackerTile);
+                                if (!IsCheck(temporaryBoard, kingTile, isWhiteMoving))
+                                {
+                                    return false;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -120,42 +166,47 @@ public static class Rules
         // Schachmatt
         return true;
     }
-    public static bool IsCheck(Pieces[,] boardPieces, Board.Tile toTile, bool isWhite)
+    public static bool IsCheck(Board board, Board.Tile toTile, bool isWhite)
     {
-        return SearchAttackingPreset(boardPieces, toTile, isWhite).Any();
+        return SearchAttackingPreset(board, toTile, isWhite).Any();
     }
 
     // kann man nur benutzen, wenn man geprüft hat IsCheck !!!
-    public static int CountAttacking(Pieces[,] boardPieces, Board.Tile toTile, bool isWhite)
+    public static int CountAttacking(Board board, Board.Tile toTile, bool isWhite)
     {
-        return SearchAttackingPreset(boardPieces, toTile, isWhite).Last().count;
+        return SearchAttackingPreset(board, toTile, isWhite).Last().count;
+    }
+    
+    // kann man nur benutzen, wenn man geprüft hat IsCheck !!!
+    public static IEnumerable<Board.Tile> GetAllAttackerTiles(Board board, Board.Tile toTile, bool isWhite)
+    {
+        return SearchAttackingPreset(board, toTile, isWhite).Select(((tuple) => tuple.attacker));
     }
     
     // kann man nur benutzen, wenn Count Attacking == 2!!!
-    public static Board.Tile GetAttackerTile(Pieces[,] boardPieces, Board.Tile toTile, bool isWhite)
+    public static Board.Tile GetAttackerTile(Board board, Board.Tile toTile, bool isWhite)
     {
-        return SearchAttackingPreset(boardPieces, toTile, isWhite).First().attacker;
+        return SearchAttackingPreset(board, toTile, isWhite).First().attacker;
     }
     
-    private static IEnumerable<(int count, Board.Tile attacker)> SearchAttackingPreset(Pieces[,] boardPieces, Board.Tile toTile, bool isWhite)
+    private static IEnumerable<(int count, Board.Tile attacker)> SearchAttackingPreset(Board board, Board.Tile toTile, bool isWhite)
     {
         int count = 0;
         
         // Bei jeder Figuren schauen, ob sie den König schlagen kann
-        for (int fromRow = 0; fromRow < 8; fromRow++)
+        for (int attackerRow = 0; attackerRow < 8; attackerRow++)
         {
-            for (int fromCol = 0; fromCol < 8; fromCol++)
+            for (int attackerCol = 0; attackerCol < 8; attackerCol++)
             {
+                Board.Tile attackerTile = new Board.Tile(attackerRow, attackerCol);
                 // sucht nur die gegensätzliche Farbe -> Aufruf von weiß -> sucht nur schwarze Figuren ab
-                if (boardPieces[fromRow,fromCol].IsWhite != isWhite && boardPieces[fromRow, fromCol].DetermineMoveType(fromRow, 
-                        fromCol, toTile.Row, toTile.Col, boardPieces) != Pieces.MoveType.Invalid)
+                if (board[attackerTile].IsWhite != isWhite && 
+                    board[attackerTile].DetermineMoveType(board, attackerTile, toTile) != Pieces.MoveType.Invalid)
                 {
                     count++;
-                    yield return (count, new Board.Tile(fromRow, fromCol));
+                    yield return (count, attackerTile);
                 }
             }
         }
     }
-    
-    
 }
