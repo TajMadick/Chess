@@ -1,40 +1,25 @@
-using System.Data;
 
 namespace Schach;
 
 public static class Move
 {
-    public static bool IsCheckmatePostMove(Board board, bool isWhiteMoving)
+    public static bool InputMove(Grid grid, string move, bool isWhiteMoving)
     {
-        Board.Tile kingPos = FindKing(board, isWhiteMoving);
-        if (Rules.IsCheck(board, kingPos, isWhiteMoving))
-        {
-            if (Rules.IsCheckmate(board, kingPos, isWhiteMoving))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-    
-    public static bool InputMove(Board board, string move, bool isWhiteMoving)
-    {
-        if (!Rules.PassesSanityChecks(board, move, isWhiteMoving))
+        if (!Rules.PassesSanityChecks(grid, move, isWhiteMoving))
         {
             return false;
         }
         
-        Rules.CalculateCoordinates(move, out Board.Tile fromTile, out Board.Tile toTile);
+        Rules.CalculateCoordinates(move, out Grid.Tile fromTile, out Grid.Tile toTile);
 
-        ref Pieces fromPiece = ref board.GetRef(fromTile);
-        ref Pieces toPiece = ref board.GetRef(toTile);
+        ref Pieces fromPiece = ref grid.GetRef(fromTile);
+        ref Pieces toPiece = ref grid.GetRef(toTile);
 
-        Pieces.MoveType determinedMoveType = fromPiece.DetermineMoveType(board, fromTile, toTile);
+        Pieces.MoveType determinedMoveType = fromPiece.DetermineMoveType(grid, fromTile, toTile);
 
         if (determinedMoveType == Pieces.MoveType.Promotion)
         {
-            if (MovePiece(board, fromTile, toTile, isWhiteMoving))
+            if (MovePiece(grid, fromTile, toTile, isWhiteMoving))
             { 
                 toPiece = new Queen(isWhiteMoving);
                 return true;
@@ -47,12 +32,12 @@ public static class Move
         
         if (determinedMoveType == Pieces.MoveType.EnPassant)
         {
-            if (MovePiece(board, fromTile, toTile, isWhiteMoving))
+            if (MovePiece(grid, fromTile, toTile, isWhiteMoving))
             { 
                 int diffCol = toTile.Col - fromTile.Col;
                 
                 // Bauern daneben schlagen
-                board[fromTile.Row, fromTile.Col + diffCol] = new Empty();
+                grid[fromTile.Row, fromTile.Col + diffCol] = new Empty();
                 return true;
             }
             else
@@ -73,7 +58,7 @@ public static class Move
             // TODO Schon wieder bissl her schauen warum überhaupt +dir
             for (int col = fromTile.Col; col != (toTile.Col+dir); col += dir)
             {
-                if (Rules.IsCheck(board, new Board.Tile(toTile.Row, col), isWhiteMoving))
+                if (Rules.IsCheck(grid, new Grid.Tile(toTile.Row, col), isWhiteMoving))
                 {
                     Console.Write("Can't castle! Tiles are in check");
                     Console.ReadKey();
@@ -81,8 +66,8 @@ public static class Move
                 }
             }
 
-            ref Pieces fromRookTile = ref board.GetRef(fromTile.Row, rookCol);
-            ref Pieces toRookTile = ref board.GetRef(fromTile.Row, fromTile.Col + dir);
+            ref Pieces fromRookTile = ref grid.GetRef(fromTile.Row, rookCol);
+            ref Pieces toRookTile = ref grid.GetRef(fromTile.Row, fromTile.Col + dir);
 
             // moving rook
             toRookTile = fromRookTile;
@@ -97,7 +82,7 @@ public static class Move
         
         if (determinedMoveType == Pieces.MoveType.Normal)
         {
-            if (MovePiece(board, fromTile, toTile, isWhiteMoving))
+            if (MovePiece(grid, fromTile, toTile, isWhiteMoving))
             { 
                 return true;
             }
@@ -117,45 +102,25 @@ public static class Move
         return false;
     }
 
-    private static Board.Tile FindKing(Board board, bool isWhite)
+    private static bool MovePiece(Grid grid, Grid.Tile fromTile, Grid.Tile  toTile, bool isWhiteMoving)
     {
-        // König finden
-        for (int row = 0; row < 8; row++)
-        {
-            for (int col = 0; col < 8; col++)
-            {
-                Board.Tile kingTile = new Board.Tile(row, col);
-                if (board[kingTile] is King && board[kingTile].IsWhite == isWhite)
-                {
-                    return kingTile;
-                }
-            }
-        }
-
-        return new Board.Tile(0, 0);
-    }
-
-    private static bool MovePiece(Board board, Board.Tile fromTile, Board.Tile  toTile, bool isWhiteMoving)
-    {
-        if (board[fromTile] is King king) king.HasMoved = true;
-        if (board[fromTile] is Rook rook) rook.HasMoved = true;
-
-        Pieces oldToTile = board[toTile];
-        board[toTile] = board[fromTile];
-        board[fromTile] = new Empty();
-
+        if (grid[fromTile] is King king) king.HasMoved = true;
+        if (grid[fromTile] is Rook rook) rook.HasMoved = true;
+        
         // Check if King will be in Check after moving
-        Board temporaryBoard = Rules.TemporaryMove(board, fromTile, toTile);
-        if (Rules.IsCheck(temporaryBoard,FindKing(temporaryBoard, isWhiteMoving), isWhiteMoving))
+        Grid temporaryGrid = Rules.TemporaryMove(grid, fromTile, toTile);
+        if (Rules.IsCheck(temporaryGrid,Rules.FindKing(temporaryGrid, isWhiteMoving), isWhiteMoving))
         {
-            board[fromTile] = board[toTile];
-            board[toTile] = oldToTile;
-
             Console.Write($"Your King will be in Check");
             Console.ReadKey();
             return false;
         }
-
-        return true;
+        else
+        {
+            // Kein Check man kann bewegen
+            grid[toTile] = grid[fromTile];
+            grid[fromTile] = new Empty();
+            return true;
+        }
     }
 }
