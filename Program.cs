@@ -8,7 +8,7 @@ namespace Schach
         {
             Grid grid = new Grid();
             Game game = new Game();
-            Board.FenParser("r1bqkb1r/pppp1Qpp/2n2n2/4p1N1/4P3/8/PPPP1PPP/RNB1K2R b KQkq -", grid, game);
+            Board.FenParser("r2qk2r/8/8/8/8/8/8/RBBQKBBR w KQkq -", grid, game);
             game.GameLoop(grid);
         }
     }

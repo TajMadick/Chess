@@ -1,30 +1,17 @@
 namespace Schach;
 
-public abstract class Pieces
+internal interface ISlidingPieces
 {
-    protected Pieces(bool isWhite)
-    {
-        IsWhite = isWhite;
-    }
-    
-    public enum MoveType
-    {
-        Invalid,
-        Promotion,
-        Castling,
-        Normal,
-        EnPassant
-    }
-    
-    public bool IsWhite { get; }
+    IEnumerable<Grid.Tile> FieldsOnPath(Grid grid, Grid.Tile fromTile, Grid.Tile toTile);
+}
+public abstract class Pieces(bool isWhite)
+{
+    public bool IsWhite { get; } = isWhite;
+
     public abstract char GetIcon();
-
     public abstract Pieces Copy();
-    public abstract MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile);
-
-    public abstract IEnumerable<Grid.Tile> FieldsOnPath(Grid grid, Grid.Tile fromTile, Grid.Tile toTile);
-
-    public IEnumerable<Grid.Tile> AllPossibleMoves(Grid grid, Grid.Tile fromTile)
+    public abstract Types.MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile);
+    public IEnumerable<Grid.Tile> AllMoves(Grid grid, Grid.Tile fromTile)
     {
         for (int row = 0; row < 8; row++)
         {
@@ -33,20 +20,49 @@ public abstract class Pieces
                 Grid.Tile toTile = new Grid.Tile(row, col);
                 
                 if (fromTile != toTile &&
-                    grid[fromTile].DetermineMoveType(grid, fromTile, toTile) != MoveType.Invalid)
+                    grid[fromTile].DetermineMoveType(grid, fromTile, toTile) != Types.MoveType.Invalid)
                 {
                     yield return toTile;
                 }
             }
         }
     }
-
-    protected bool LoopThrough(Grid grid, Grid.Tile fromTile, Grid.Tile toTile, int dirRow, int dirCol)
+    
+    protected Grid.Tile DetermineDirection(Grid.Tile fromTile, Grid.Tile toTile)
     {
-        int row = fromTile.Row += dirRow;
-        int col = fromTile.Col += dirCol;
+        int diffCol = Math.Abs(toTile.Col - fromTile.Col);
+        int diffRow = Math.Abs(toTile.Row - fromTile.Row);
+
+        Grid.Tile direction = new Grid.Tile();
         
-        for (; row is >= 0 and < 8 && col is >= 0 and < 8; row += dirRow, col += dirCol)
+        // läuft auf Cols -> Horizontal
+        if (fromTile.Row == toTile.Row)
+        {
+            direction.Col = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
+        }
+        
+        // läuft auf Rows -> Vertikal
+        if (fromTile.Col == toTile.Col)
+        {
+            direction.Row = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
+        }
+
+        // läuft diagonal
+        if (diffCol == diffRow)
+        {
+            direction.Col = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
+            direction.Row = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
+        }
+
+        return direction;
+    }
+    protected bool LoopThrough(Grid grid, Grid.Tile fromTile, Grid.Tile toTile, Grid.Tile direction)
+    {
+        // gleich mal eins in die Richtung gehen damit man nicht auf selben Feld startet
+        int row = fromTile.Row += direction.Row;
+        int col = fromTile.Col += direction.Col;
+        
+        for (; row is >= 0 and < 8 && col is >= 0 and < 8; row += direction.Row, col += direction.Col)
         {
             Grid.Tile runnerTile = new Grid.Tile(row, col);
             // wenn die Runner es bis zum Ziel geschafft haben -> true
@@ -61,12 +77,11 @@ public abstract class Pieces
                 return false;
             }
         }
-        
         return false;
     }
-
-    // TODO: das alles schöner machen das momentan schiach
-    protected bool IsFieldOnPath(Grid grid, Grid.Tile fromTile, Grid.Tile targetTile, Grid.Tile toTile, int dirRow, int dirCol)
+    
+    // Todo: kann man safe noch besser machen
+    protected bool IsFieldOnPath(Grid.Tile fromTile, Grid.Tile targetTile, Grid.Tile toTile, Grid.Tile direction)
     {
         int lowerBoundRow = (fromTile.Row < toTile.Row) ? toTile.Row : -1;
         int upperBoundRow = (fromTile.Row < toTile.Row) ? 8 : toTile.Row;
@@ -77,7 +92,7 @@ public abstract class Pieces
         int col = fromTile.Col;
         
         for (; row > lowerBoundRow && row < upperBoundRow && col > lowerBoundCol && col < upperBoundCol; 
-             row += dirRow, col += dirCol)
+             row += direction.Row, col += direction.Col)
         {
             Grid.Tile runnerTile = new Grid.Tile(row, col);
             if (runnerTile == targetTile)
@@ -90,32 +105,15 @@ public abstract class Pieces
     }
 }
 
-public class Pawn : Pieces
+public class Pawn(bool isWhite) : Pieces(isWhite)
 {
-    public Pawn(bool isWhite) : base(isWhite)
-    {
-        IsEnPassantable = false;
-    }
-
     public override Pieces Copy()
     {
         return new Pawn(IsWhite) { IsEnPassantable = IsEnPassantable };
     }
-    
-    public bool IsEnPassantable { get; set; }
-
-    private bool IsPromotable(int row)
-    {
-        int end = (IsWhite) ? 0 : 7;
-        return row == end;
-    }
-
-    public override IEnumerable<Grid.Tile> FieldsOnPath(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
-    {
-        yield return new Grid.Tile(0, 0);
-    }
-    
-    public override MoveType DetermineMoveType(Grid grid,Grid.Tile fromTile, Grid.Tile toTile)
+    public bool IsEnPassantable { get; set; } = false;
+    private bool IsPromotable(int row) => row == (IsWhite ? 0 : 7);
+    public override Types.MoveType DetermineMoveType(Grid grid,Grid.Tile fromTile, Grid.Tile toTile)
     {
         IsEnPassantable = false;
         
@@ -130,8 +128,8 @@ public class Pawn : Pieces
         // Diagonal nehmen -> nur 1 nach links oder rechts, es muss eine Figur dort stehen, es muss das nächste Feld sein
         if (Math.Abs(diffCol) == 1 && grid[toTile] is not Empty && moveOneField == toTile.Row)
         {
-            if (IsPromotable(toTile.Row)) return MoveType.Promotion;
-            return MoveType.Normal;
+            if (IsPromotable(toTile.Row)) return Types.MoveType.Promotion;
+            return Types.MoveType.Normal;
         }
         
         // En Passant -> nur 1 nach links oder rechts, muss das nächste Feld sein, das Piece daneben muss ein Bauer sein
@@ -140,7 +138,7 @@ public class Pawn : Pieces
             // wenn das Piece daneben EnPassantable is dann bam
             if (besidePawn.IsEnPassantable)
             {
-                return MoveType.EnPassant;
+                return Types.MoveType.EnPassant;
             }
         }
         
@@ -151,7 +149,7 @@ public class Pawn : Pieces
             if (grid[moveOneField, fromTile.Col] is Empty && grid[moveTwoField, fromTile.Col] is Empty)
             {
                 IsEnPassantable = true;
-                return MoveType.Normal;
+                return Types.MoveType.Normal;
             }
         }
         
@@ -161,34 +159,23 @@ public class Pawn : Pieces
             // check if nextField is free
             if (grid[moveOneField, fromTile.Col] is Empty)
             {
-                if (IsPromotable(toTile.Row)) return MoveType.Promotion;
-                return MoveType.Normal;
+                if (IsPromotable(toTile.Row)) return Types.MoveType.Promotion;
+                return Types.MoveType.Normal;
             }
         }
         
-        return MoveType.Invalid;
+        return Types.MoveType.Invalid;
     }
-    public override char GetIcon()
-    {
-        if (IsWhite) return '♟';
-        else return '♙';
-    }
+    public override char GetIcon() => (IsWhite) ? '♟' : '♙';
 }
 
-public class Knight : Pieces
+public class Knight(bool isWhite) : Pieces(isWhite)
 {
-    public Knight(bool isWhite) : base(isWhite) { }
-    
     public override Pieces Copy()
     {
         return new Knight(IsWhite);
     }
-    
-    public override IEnumerable<Grid.Tile> FieldsOnPath(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
-    {
-        yield return new Grid.Tile(0, 0);}
-
-    public override MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
+    public override Types.MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
     {
         int diffCol = Math.Abs(toTile.Col - fromTile.Col);
         int diffRow = Math.Abs(toTile.Row - fromTile.Row);
@@ -196,286 +183,169 @@ public class Knight : Pieces
         if (diffCol == 1 && diffRow == 2 ||
             diffCol == 2 && diffRow == 1)
         {
-            return MoveType.Normal;
+            return Types.MoveType.Normal;
         }
         
-        return MoveType.Invalid;
+        return Types.MoveType.Invalid;
     }
 
-    public override char GetIcon()
-    {
-        if (IsWhite) return '♞';
-        else return '♘';
-    }
+    public override char GetIcon() =>(IsWhite) ? '♞' : '♘';
 }
 
-public class Bishop : Pieces
+public class Bishop(bool isWhite) : Pieces(isWhite), ISlidingPieces
 {
-    public Bishop(bool isWhite) : base(isWhite) { }
-
     public override Pieces Copy()
     {
         return new Bishop(IsWhite);
     }
     
-    public override MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
+    public override Types.MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
     {
-        int dirCol = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
-        int dirRow = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
+        Grid.Tile direction = DetermineDirection(fromTile, toTile);
         
-        if (LoopThrough(grid, fromTile, toTile, dirRow, dirCol))
+        if (LoopThrough(grid, fromTile, toTile, direction))
         {
-            return MoveType.Normal;
+            return Types.MoveType.Normal;
         }
         else
         {
-            return MoveType.Invalid;
+            return Types.MoveType.Invalid;
         }
     }
-
-    public override IEnumerable<Grid.Tile> FieldsOnPath(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
+    public IEnumerable<Grid.Tile> FieldsOnPath(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
     {
-        int dirCol = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
-        int dirRow = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
+        Grid.Tile direction = DetermineDirection(fromTile, toTile);
         
-        foreach (Grid.Tile tile in grid[fromTile].AllPossibleMoves(grid, fromTile))
+        foreach (Grid.Tile tile in grid[fromTile].AllMoves(grid, fromTile))
         {
-            if (IsFieldOnPath(grid, fromTile, tile, toTile, dirRow, dirCol))
+            if (IsFieldOnPath(fromTile, tile, toTile, direction))
             {
                 yield return tile;
             }
         }
     }
 
-    public override char GetIcon()
-    {
-        if (IsWhite) return '♝';
-        else return '♗';
-    }
+    public override char GetIcon() => (IsWhite) ? '♝' : '♗';
 }
 
-public class Rook : Pieces
+public class Rook(bool isWhite) : Pieces(isWhite), ISlidingPieces
 {
-    public Rook(bool isWhite) : base(isWhite)
-    {
-        HasMoved = true;
-    }
-    
     public override Pieces Copy()
     {
         return new Rook(IsWhite) {HasMoved = HasMoved};
     }
     
-    public bool HasMoved { get; set; }
+    public bool HasMoved { get; set; } = true;
 
-    public override MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
+    public override Types.MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
     {
-        int dirCol = 0, dirRow = 0;
-        
-        // Rook läuft auf Cols -> Horizontal
-        if (fromTile.Row == toTile.Row)
-        {
-            dirCol = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
+        Grid.Tile direction = DetermineDirection(fromTile, toTile);
 
-        }
-        
-        // Rook läuft auf Rows -> Vertikal
-        if (fromTile.Col == toTile.Col)
+        if (LoopThrough(grid, fromTile, toTile, direction))
         {
-            dirRow = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
-        }
-
-        if (LoopThrough(grid, fromTile, toTile, dirRow, dirCol))
-        {
-            return MoveType.Normal;
+            return Types.MoveType.Normal;
         }
         else
         {
-            return MoveType.Invalid;
+            return Types.MoveType.Invalid;
         }
     }
     
-    public override IEnumerable<Grid.Tile> FieldsOnPath(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
+    public IEnumerable<Grid.Tile> FieldsOnPath(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
     {
-        int dirCol = 0, dirRow = 0;
+        Grid.Tile direction = DetermineDirection(fromTile, toTile);
         
-        // Rook läuft auf Cols -> Horizontal
-        if (fromTile.Row == toTile.Row)
+        foreach (Grid.Tile tile in grid[fromTile].AllMoves(grid, fromTile))
         {
-            dirCol = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
-
-        }
-        
-        // Rook läuft auf Rows -> Vertikal
-        if (fromTile.Col == toTile.Col)
-        {
-            dirRow = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
-        }
-        
-        foreach (Grid.Tile tile in grid[fromTile].AllPossibleMoves(grid, fromTile))
-        {
-            if (IsFieldOnPath(grid, fromTile, tile, toTile, dirRow, dirCol))
+            if (IsFieldOnPath(fromTile, tile, toTile, direction))
             {
                 yield return tile;
             }
         }
     }
-    public override char GetIcon()
-    {
-        if (IsWhite) return '♜';
-        else return '♖';
-    }
+    public override char GetIcon() => (IsWhite) ? '♜' : '♖';
 }
 
-public class Queen : Pieces
+public class Queen(bool isWhite) : Pieces(isWhite), ISlidingPieces
 {
-    public Queen(bool isWhite) : base(isWhite) { }
-
     public override Pieces Copy()
     {
         return new Queen(IsWhite);
     }
 
-    public override MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
+    public override Types.MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
     {
-        int diffCol = Math.Abs(toTile.Col - fromTile.Col);
-        int diffRow = Math.Abs(toTile.Row - fromTile.Row);
-        
-        int dirCol = 0, dirRow = 0;
-        
-        // Queen läuft auf Cols -> Horizontal
-        if (fromTile.Row == toTile.Row)
-        {
-            dirCol = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
-        }
-        
-        // Queen läuft auf Rows -> Vertikal
-        if (fromTile.Col == toTile.Col)
-        {
-            dirRow = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
-        }
+        Grid.Tile direction = DetermineDirection(fromTile, toTile);
 
-        // Queen läuft diagonal
-        if (diffCol == diffRow)
+        if (LoopThrough(grid, fromTile, toTile, direction))
         {
-            dirCol = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
-            dirRow = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
-        }
-
-        if (LoopThrough(grid, fromTile, toTile, dirRow, dirCol))
-        {
-            return MoveType.Normal;
+            return Types.MoveType.Normal;
         }
         else
         {
-            return MoveType.Invalid;
+            return Types.MoveType.Invalid;
         }
     }
     
-    public override IEnumerable<Grid.Tile> FieldsOnPath(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
+    // Todo: Schiach besser machen
+    public IEnumerable<Grid.Tile> FieldsOnPath(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
     {
-        int diffCol = Math.Abs(toTile.Col - fromTile.Col);
-        int diffRow = Math.Abs(toTile.Row - fromTile.Row);
+        Grid.Tile direction = DetermineDirection(fromTile, toTile);
         
-        int dirCol = 0, dirRow = 0;
-        
-        // Queen läuft auf Cols -> Horizontal
-        if (fromTile.Row == toTile.Row)
+        foreach (Grid.Tile tile in grid[fromTile].AllMoves(grid, fromTile))
         {
-            dirCol = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
-        }
-        
-        // Queen läuft auf Rows -> Vertikal
-        if (fromTile.Col == toTile.Col)
-        {
-            dirRow = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
-        }
-
-        // Queen läuft diagonal
-        if (diffCol == diffRow)
-        {
-            dirCol = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
-            dirRow = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
-        }
-        
-        foreach (Grid.Tile tile in grid[fromTile].AllPossibleMoves(grid, fromTile))
-        {
-            if (IsFieldOnPath(grid, fromTile, tile, toTile, dirRow, dirCol))
+            if (IsFieldOnPath(fromTile, tile, toTile, direction))
             {
                 yield return tile;
             }
         }
     }
 
-    public override char GetIcon()
-    {
-        if (IsWhite) return '♛';
-        else return '♕';
-    }
+    public override char GetIcon() => (IsWhite) ? '♛' :'♕';
 }
 
-public class King : Pieces
+public class King(bool isWhite) : Pieces(isWhite)
 {
-    public King(bool isWhite) : base(isWhite)
-    {
-        HasMoved = false;
-    }
-    
     public override Pieces Copy()
     {
         return new King(IsWhite) {HasMoved = HasMoved};
     }
     
-    public bool HasMoved { get; set; }
-    
-    public override IEnumerable<Grid.Tile> FieldsOnPath(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
-    {
-        yield return new Grid.Tile(0, 0);}
+    public bool HasMoved { get; set; } = false;
 
-    public override MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
+    public override Types.MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
     {
         int diffCol = toTile.Col - fromTile.Col;
         int diffRow = toTile.Row - fromTile.Row;
-        
-        int start = (IsWhite) ? 7 : 0;
-
-        int rookCol = (diffCol > 0) ? 7 : 0;
-        int dirCol = (diffCol > 0) ? 1 : -1;
 
         if (Math.Abs(diffCol) <= 1 && Math.Abs(diffRow) <= 1)
         {
-            return MoveType.Normal;
+            return Types.MoveType.Normal;
         }
+        
+        // soll nur horizontale direction herausfinden deshalb row = 0
+        Grid.Tile direction = DetermineDirection(fromTile, toTile);
+        direction.Row = 0;
+        
+        int start = (IsWhite) ? 7 : 0;
+        int rookCol = (diffCol > 0) ? 7 : 0;
         
         if (!HasMoved && grid[start, rookCol] is Rook { HasMoved: false })
         {
-            if (LoopThrough(grid, fromTile, toTile, 0, dirCol))
+            if (LoopThrough(grid, fromTile, toTile, direction))
             {
-                return MoveType.Castling;
+                return Types.MoveType.Castling;
             }
         }
         
-        return MoveType.Invalid;
+        return Types.MoveType.Invalid;
     }
-    public override char GetIcon()
-    {
-        if (IsWhite) return '♚';
-        else return '♔';
-    }
+    public override char GetIcon() => (IsWhite) ? '♚' : '♔';
 }
 
-public class Empty : Pieces
+public class Empty() : Pieces(false)
 {
-    public Empty() : base(false) { }
-    
-    public override Pieces Copy()
-    {
-        return new Empty();
-    }
-    
-    public override IEnumerable<Grid.Tile> FieldsOnPath(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
-    {
-        yield return new Grid.Tile(0, 0);}
-    public override MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile) => MoveType.Invalid;
+    public override Pieces Copy() => new Empty();
+    public override Types.MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile) => Types.MoveType.Invalid;
     public override char GetIcon() => ' ';
 }

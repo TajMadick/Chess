@@ -14,6 +14,14 @@ public class Game
             return;
         }
         
+        // bevor das Spiel anfängt, prüfen, ob schon ein Checkmate ist
+        if (Rules.IsStalemate(grid, IsWhiteMoving) || Rules.IsStalemate(grid, !IsWhiteMoving))
+        {
+            Board.DrawBoard(grid);
+            Console.Write("Stalemate");
+            return;
+        }
+        
         while (true)
         {
             Board.DrawBoard(grid);
@@ -27,9 +35,9 @@ public class Game
             {
                 break;
             }
-                
+
             if (Move.InputMove(grid, userInput, IsWhiteMoving))
-            {
+            { 
                 IsWhiteMoving = !IsWhiteMoving;
                 if (Rules.IsCheckmate(grid, IsWhiteMoving))
                 {

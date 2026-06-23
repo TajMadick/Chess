@@ -5,19 +5,19 @@ public static class Move
 {
     public static bool InputMove(Grid grid, string move, bool isWhiteMoving)
     {
-        if (!Rules.PassesSanityChecks(grid, move, isWhiteMoving))
+        if (!Validation.PassesSanityChecks(grid, move, isWhiteMoving))
         {
             return false;
         }
         
-        Rules.CalculateCoordinates(move, out Grid.Tile fromTile, out Grid.Tile toTile);
+        Utils.CalculateCoordinates(move, out Grid.Tile fromTile, out Grid.Tile toTile);
 
         ref Pieces fromPiece = ref grid.GetRef(fromTile);
         ref Pieces toPiece = ref grid.GetRef(toTile);
 
-        Pieces.MoveType determinedMoveType = fromPiece.DetermineMoveType(grid, fromTile, toTile);
+        Types.MoveType determinedMoveType = fromPiece.DetermineMoveType(grid, fromTile, toTile);
 
-        if (determinedMoveType == Pieces.MoveType.Promotion)
+        if (determinedMoveType == Types.MoveType.Promotion)
         {
             if (MovePiece(grid, fromTile, toTile, isWhiteMoving))
             { 
@@ -30,7 +30,7 @@ public static class Move
             }
         }
         
-        if (determinedMoveType == Pieces.MoveType.EnPassant)
+        if (determinedMoveType == Types.MoveType.EnPassant)
         {
             if (MovePiece(grid, fromTile, toTile, isWhiteMoving))
             { 
@@ -46,7 +46,7 @@ public static class Move
             }
         }
         
-        if (determinedMoveType == Pieces.MoveType.Castling)
+        if (determinedMoveType == Types.MoveType.Castling)
         {
             int diffCol = toTile.Col - fromTile.Col;
             
@@ -55,10 +55,10 @@ public static class Move
             int rookCol = (diffCol > 0) ? 7 : 0;
             
             // Tiles dazwischen checken, ob in check und mit toCol+dir auch das Tile wohin King will
-            // TODO Schon wieder bissl her schauen warum überhaupt +dir
+            // +dir, weil Schleife geht nur bis zu dem toCol und bricht da ab bevor er prüft mit +dir geht er eins weiter
             for (int col = fromTile.Col; col != (toTile.Col+dir); col += dir)
             {
-                if (Rules.IsCheck(grid, new Grid.Tile(toTile.Row, col), isWhiteMoving))
+                if (Rules.IsAttackingField(grid, new Grid.Tile(toTile.Row, col), isWhiteMoving))
                 {
                     Console.Write("Can't castle! Tiles are in check");
                     Console.ReadKey();
@@ -80,7 +80,7 @@ public static class Move
             return true;
         }
         
-        if (determinedMoveType == Pieces.MoveType.Normal)
+        if (determinedMoveType == Types.MoveType.Normal)
         {
             if (MovePiece(grid, fromTile, toTile, isWhiteMoving))
             { 
@@ -92,7 +92,7 @@ public static class Move
             }
         }
         
-        if (determinedMoveType == Pieces.MoveType.Invalid)
+        if (determinedMoveType == Types.MoveType.Invalid)
         {
             Console.WriteLine("Incorrect movement");
             Console.ReadKey();
@@ -108,8 +108,8 @@ public static class Move
         if (grid[fromTile] is Rook rook) rook.HasMoved = true;
         
         // Check if King will be in Check after moving
-        Grid temporaryGrid = Rules.TemporaryMove(grid, fromTile, toTile);
-        if (Rules.IsCheck(temporaryGrid,Rules.FindKing(temporaryGrid, isWhiteMoving), isWhiteMoving))
+        Grid temporaryGrid = TemporaryMove(grid, fromTile, toTile);
+        if (Rules.IsAttackingField(temporaryGrid,Rules.FindKing(temporaryGrid, isWhiteMoving), isWhiteMoving))
         {
             Console.Write($"Your King will be in Check");
             Console.ReadKey();
@@ -122,5 +122,13 @@ public static class Move
             grid[fromTile] = new Empty();
             return true;
         }
+    }
+    
+    public static Grid TemporaryMove(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
+    {
+        Grid temporaryGrid = new Grid(grid);
+        temporaryGrid[toTile] = temporaryGrid[fromTile];
+        temporaryGrid[fromTile] = new Empty();
+        return temporaryGrid;
     }
 }
