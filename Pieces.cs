@@ -89,13 +89,25 @@ public abstract class Pieces(bool isWhite)
     // Todo: kann man safe noch besser machen
     protected bool IsFieldOnPath(Grid.Tile fromTile, Grid.Tile targetTile, Grid.Tile toTile, Grid.Tile direction)
     {
-        int lowerBoundRow = (fromTile.Row < toTile.Row) ? fromTile.Row : toTile.Row;
-        int upperBoundRow = (fromTile.Row < toTile.Row) ? toTile.Row : fromTile.Row;
-        int lowerBoundCol = (fromTile.Col < toTile.Col) ? fromTile.Col : toTile.Col;
-        int upperBoundCol = (fromTile.Col < toTile.Col) ? toTile.Col : fromTile.Col;
+        int lowerBoundRow = -1;
+        int lowerBoundCol = -1;
+        int upperBoundRow = 8;
+        int upperBoundCol = 8;
+        
+        if (fromTile.Row != toTile.Row)
+        {
+            lowerBoundRow = (fromTile.Row < toTile.Row) ? fromTile.Row : toTile.Row;
+            upperBoundRow = (fromTile.Row < toTile.Row) ? toTile.Row : fromTile.Row;
+        }
 
+        if (fromTile.Col != toTile.Col)
+        {
+            lowerBoundCol = (fromTile.Col < toTile.Col) ? fromTile.Col : toTile.Col;
+            upperBoundCol = (fromTile.Col < toTile.Col) ? toTile.Col : fromTile.Col;
+        }
+        
         int row = fromTile.Row += direction.Row;
-        int col = fromTile.Col += direction.Row;
+        int col = fromTile.Col += direction.Col;
         
         for (; row > lowerBoundRow && row < upperBoundRow && col > lowerBoundCol && col < upperBoundCol; 
              row += direction.Row, col += direction.Col)
