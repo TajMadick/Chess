@@ -17,4 +17,15 @@ public static class Types
         Normal,
         EnPassant
     }
+
+    public enum PieceType
+    {
+        Pawn,
+        Knight,
+        Bishop,
+        Rook,
+        Queen,
+        King,
+        Empty
+    }
 }

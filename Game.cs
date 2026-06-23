@@ -7,7 +7,8 @@ public class Game
     public void GameLoop(Grid grid)
     {
         // bevor das Spiel anfängt, prüfen, ob schon ein Checkmate ist
-        if (Rules.IsCheckmate(grid, IsWhiteMoving) || Rules.IsCheckmate(grid, !IsWhiteMoving))
+        // gecheckt wird die jeweils andere Farbe, die dran ist
+        if (Rules.IsCheckmate(grid, !IsWhiteMoving, IsWhiteMoving))
         {
             Board.DrawBoard(grid);
             Console.Write("Checkmate");
@@ -39,7 +40,7 @@ public class Game
             if (Move.InputMove(grid, userInput, IsWhiteMoving))
             { 
                 IsWhiteMoving = !IsWhiteMoving;
-                if (Rules.IsCheckmate(grid, IsWhiteMoving))
+                if (Rules.IsCheckmate(grid, IsWhiteMoving, IsWhiteMoving))
                 {
                     Board.DrawBoard(grid);
                     Console.Write("Checkmate");

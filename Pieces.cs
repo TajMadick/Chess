@@ -35,23 +35,28 @@ public abstract class Pieces(bool isWhite)
 
         Grid.Tile direction = new Grid.Tile();
         
-        // läuft auf Cols -> Horizontal
-        if (fromTile.Row == toTile.Row)
-        {
-            direction.Col = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
-        }
-        
-        // läuft auf Rows -> Vertikal
-        if (fromTile.Col == toTile.Col)
-        {
-            direction.Row = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
-        }
+        if (this is not Rook)
+            
+            // läuft diagonal
+            if (diffCol == diffRow)
+            {
+                direction.Col = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
+                direction.Row = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
+            }   
 
-        // läuft diagonal
-        if (diffCol == diffRow)
+        if (this is not Bishop)
         {
-            direction.Col = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
-            direction.Row = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
+            // läuft auf Rows -> Vertikal
+            if (fromTile.Col == toTile.Col)
+            {
+                direction.Row = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
+            }
+            
+            // läuft auf Cols -> Horizontal
+            if (fromTile.Row == toTile.Row)
+            {
+                direction.Col = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
+            }
         }
 
         return direction;
@@ -80,16 +85,17 @@ public abstract class Pieces(bool isWhite)
         return false;
     }
     
+    // ich glaub man kann das durch looptrhough austauschen das muss ich mir wann anders anschaun
     // Todo: kann man safe noch besser machen
     protected bool IsFieldOnPath(Grid.Tile fromTile, Grid.Tile targetTile, Grid.Tile toTile, Grid.Tile direction)
     {
-        int lowerBoundRow = (fromTile.Row < toTile.Row) ? toTile.Row : -1;
-        int upperBoundRow = (fromTile.Row < toTile.Row) ? 8 : toTile.Row;
-        int lowerBoundCol = (fromTile.Col < toTile.Col) ? toTile.Col : -1;
-        int upperBoundCol = (fromTile.Col < toTile.Col) ? 8 : toTile.Col;
+        int lowerBoundRow = (fromTile.Row < toTile.Row) ? fromTile.Row : toTile.Row;
+        int upperBoundRow = (fromTile.Row < toTile.Row) ? toTile.Row : fromTile.Row;
+        int lowerBoundCol = (fromTile.Col < toTile.Col) ? fromTile.Col : toTile.Col;
+        int upperBoundCol = (fromTile.Col < toTile.Col) ? toTile.Col : fromTile.Col;
 
-        int row = fromTile.Row;
-        int col = fromTile.Col;
+        int row = fromTile.Row += direction.Row;
+        int col = fromTile.Col += direction.Row;
         
         for (; row > lowerBoundRow && row < upperBoundRow && col > lowerBoundCol && col < upperBoundCol; 
              row += direction.Row, col += direction.Col)
@@ -100,7 +106,6 @@ public abstract class Pieces(bool isWhite)
                 return true;
             }
         }
-
         return false;
     }
 }
@@ -113,7 +118,7 @@ public class Pawn(bool isWhite) : Pieces(isWhite)
     }
     public bool IsEnPassantable { get; set; } = false;
     private bool IsPromotable(int row) => row == (IsWhite ? 0 : 7);
-    public override Types.MoveType DetermineMoveType(Grid grid,Grid.Tile fromTile, Grid.Tile toTile)
+    public override Types.MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
     {
         IsEnPassantable = false;
         
@@ -286,8 +291,6 @@ public class Queen(bool isWhite) : Pieces(isWhite), ISlidingPieces
             return Types.MoveType.Invalid;
         }
     }
-    
-    // Todo: Schiach besser machen
     public IEnumerable<Grid.Tile> FieldsOnPath(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
     {
         Grid.Tile direction = DetermineDirection(fromTile, toTile);

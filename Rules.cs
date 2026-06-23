@@ -33,37 +33,43 @@ public static class Rules
 
         return true;
     }
-    public static bool IsCheckmate(Grid grid, bool isWhiteMoving)
+    public static bool IsCheckmate(Grid grid, bool isWhiteChecking, bool isWhiteMoving)
     {
         // Prüfen ob König überhaupt angegriffen wird -> wenn nein kein Schachmatt
-        Grid.Tile kingTile = FindKing(grid, isWhiteMoving);
-        if (!IsAttackingField(grid, kingTile, isWhiteMoving))
+        Grid.Tile kingTile = FindKing(grid, isWhiteChecking);
+        if (!IsAttackingField(grid, kingTile, isWhiteChecking))
         {
             return false;
         }
+        // wenn sein König momentan Check ist aber er nicht dran ist ist Checkmate
+        // (passiert nur bei custom fen Notation)
+        else if (IsAttackingField(grid, kingTile, isWhiteChecking) && isWhiteMoving != isWhiteChecking)
+        {
+            return true;
+        }
 
         // als Erstes prüfen, ob König abhauen kann -> kein Schachmatt 
-        if (AllLegalMoves(grid, kingTile, isWhiteMoving).Any())
+        if (AllLegalMoves(grid, kingTile, isWhiteChecking).Any())
         {
             return false;
         }
 
         // Wenn der König nicht abhauen kann und mehr wie ein Angreifer ist -> Schachmatt
-        if (CountAttacking(grid, kingTile, isWhiteMoving) > 1)
+        if (CountAttacking(grid, kingTile, isWhiteChecking) > 1)
         {
             return true;
         }
         
 
-        Grid.Tile attackerTile = GetAttackerTile(grid, kingTile, isWhiteMoving);
+        Grid.Tile attackerTile = GetAttackerTile(grid, kingTile, isWhiteChecking);
         ref Pieces attacker = ref grid.GetRef(attackerTile);
 
         // kann der Angreifer geschlagen werden
-        if (IsAttackingField(grid, attackerTile, !isWhiteMoving)) 
+        if (IsAttackingField(grid, attackerTile, !isWhiteChecking)) 
             // isWhiteMoving = true er schaut, ob weiß geschlagen werden kann bei diesem Feld
             // wir wollen aber genau umgekehrt schauen kann der Angreifer geschlagen werden
         {
-            foreach (Grid.Tile defenderTile in GetAllAttackerTiles(grid, attackerTile, !isWhiteMoving))
+            foreach (Grid.Tile defenderTile in GetAllAttackerTiles(grid, attackerTile, !isWhiteChecking))
             {
                 // wenn Verteidiger König ist schauen, ob er beim Verteidigen nicht ins Schach kommt
                 if (grid[defenderTile] is King)
@@ -71,7 +77,7 @@ public static class Rules
                     // temporäres Feld machen und mit König verteidigen
                     // König geht zur Angreifer Position und schauen ob er da in Check ist
                     Grid temporaryGrid = Move.TemporaryMove(grid, kingTile, attackerTile);
-                    if (!IsAttackingField(temporaryGrid, attackerTile, isWhiteMoving))
+                    if (!IsAttackingField(temporaryGrid, attackerTile, isWhiteChecking))
                     {
                         return false;
                     }
@@ -82,7 +88,7 @@ public static class Rules
                     // temporäres Feld machen und mit der Figur verteidigen
                     // wenn König danach nicht Schach ist kein Schachmatt
                     Grid temporaryGrid = Move.TemporaryMove(grid, defenderTile, attackerTile);
-                    if (!IsAttackingField(temporaryGrid, kingTile, isWhiteMoving))
+                    if (!IsAttackingField(temporaryGrid, kingTile, isWhiteChecking))
                     {
                         return false;
                     }
@@ -99,14 +105,15 @@ public static class Rules
             {
                 // durch alle Verteidiger durchgehen
                 // wenn es keine Verteidiger gibt dann geht er kein einziges Mal durch
-                foreach (Grid.Tile defenderTile in GetAllAttackerTiles(grid, attackerTile, !isWhiteMoving))
+                // es wird für alle Verteidiger geprüft, ob sie auf das Feld dazwischen gehen dürfen
+                foreach (Grid.Tile defenderTile in GetAllAttackerTiles(grid, tile, !isWhiteChecking))
                 {
-                    // wenn dieser Verteidiger nicht der König ist -> darf er nicht
+                    // wenn dieser Verteidiger der König ist -> darf er nicht
                     if (grid[defenderTile] is not King)
                     {
                         // wenn König danach nicht Schach ist kein Schachmatt
                         Grid temporaryGrid = Move.TemporaryMove(grid, defenderTile, attackerTile);
-                        if (!IsAttackingField(temporaryGrid, kingTile, isWhiteMoving))
+                        if (!IsAttackingField(temporaryGrid, kingTile, isWhiteChecking))
                         {
                             return false;
                         }
