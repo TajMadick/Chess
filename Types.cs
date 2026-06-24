@@ -2,7 +2,6 @@ namespace Schach;
 
 public static class Types
 {
-    // vllt später einbauen
     public enum Color
     {
         White,

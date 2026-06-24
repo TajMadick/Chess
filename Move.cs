@@ -3,15 +3,8 @@ namespace Schach;
 
 public static class Move
 {
-    public static bool InputMove(Grid grid, string move, bool isWhiteMoving)
+    public static bool InputMove(Grid grid, Grid.Tile fromTile, Grid.Tile toTile, bool isWhiteMoving)
     {
-        if (!Validation.PassesSanityChecks(grid, move, isWhiteMoving))
-        {
-            return false;
-        }
-        
-        Utils.CalculateCoordinates(move, out Grid.Tile fromTile, out Grid.Tile toTile);
-
         ref Pieces fromPiece = ref grid.GetRef(fromTile);
         ref Pieces toPiece = ref grid.GetRef(toTile);
 

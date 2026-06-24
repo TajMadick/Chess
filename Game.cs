@@ -36,8 +36,12 @@ public class Game
             {
                 break;
             }
+            
+            if (!Validation.PassesSanityChecks(grid, userInput, IsWhiteMoving)) continue;
+            Utils.CalculateCoordinates(userInput, out Grid.Tile fromTile, out Grid.Tile toTile);
 
-            if (Move.InputMove(grid, userInput, IsWhiteMoving))
+
+            if (Move.InputMove(grid, fromTile, toTile, IsWhiteMoving))
             { 
                 IsWhiteMoving = !IsWhiteMoving;
                 if (Rules.IsCheckmate(grid, IsWhiteMoving, IsWhiteMoving))
