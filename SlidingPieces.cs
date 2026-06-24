@@ -7,32 +7,30 @@ public abstract class SlidingPieces(bool isWhite) : Pieces(isWhite)
     // es wird von dieser Funktion die Direction ausgespuckt und wenn die Figur so nicht fahren darf is die direction 0,0
     // Dann im IsFieldOnPath bzw in der Runner werden die Runner Coordianten += die Richtung gemacht 
     // Dadurch das sich da nichts tut ist es knapp außerhalb der Bounds also gleich abbruch -> false
+    // Edit: Ist nicht mehr aktuell, da ich in den Child Klassen gleich von Beginn an prüfe jetzt
+    // ob Figur in diese Richtung fahren darf finde die alte Lösung trotzdem spannend und würde auch ohne diese Checks
+    // funktionieren ist aber bissl gemein da man sich nicht auskennt
     protected Grid.Tile DetermineDirection(Grid.Tile fromTile, Grid.Tile toTile)
     {
-        int diffCol = Math.Abs(toTile.Col - fromTile.Col);
-        int diffRow = Math.Abs(toTile.Row - fromTile.Row);
-
         Grid.Tile direction = new Grid.Tile();
-        
-        if (this is not Rook)
-            
-            // läuft diagonal
-            if (diffCol == diffRow)
+
+        if (this is not Rook)   // Rook darf nicht diagonal laufen
+        {
+            if (IsDiagonal(fromTile, toTile))
             {
                 direction.Col = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
                 direction.Row = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
             }   
+        }
 
-        if (this is not Bishop)
+        if (this is not Bishop) // Bishop darf nicht gerade laufen
         {
-            // läuft auf Rows -> Vertikal
-            if (fromTile.Col == toTile.Col)
+            if (IsVertical(fromTile, toTile))
             {
                 direction.Row = (toTile.Row - fromTile.Row > 0) ? 1 : -1;
             }
             
-            // läuft auf Cols -> Horizontal
-            if (fromTile.Row == toTile.Row)
+            if (IsHorizontal(fromTile, toTile))
             {
                 direction.Col = (toTile.Col - fromTile.Col > 0) ? 1 : -1;
             }
@@ -40,6 +38,21 @@ public abstract class SlidingPieces(bool isWhite) : Pieces(isWhite)
 
         return direction;
     }
+    protected bool IsDiagonal(Grid.Tile fromTile, Grid.Tile toTile)
+    {
+        int diffCol = Math.Abs(toTile.Col - fromTile.Col);
+        int diffRow = Math.Abs(toTile.Row - fromTile.Row);
+
+        return diffRow == diffCol;
+    }
+
+    // läuft auf Cols -> Horizontal
+    protected bool IsHorizontal(Grid.Tile fromTile, Grid.Tile toTile) =>
+        fromTile.Row == toTile.Row;
+    
+    // läuft auf Rows -> Vertikal
+    protected bool IsVertical(Grid.Tile fromTile, Grid.Tile toTile) =>
+        fromTile.Col == toTile.Col;
     
         private bool Runner(Grid grid, Grid.Tile fromTile, Grid.Tile targetTile, Grid.Tile lowerBound, Grid.Tile upperBound, Grid.Tile direction)
     {
@@ -119,6 +132,9 @@ public class Bishop(bool isWhite) : SlidingPieces(isWhite)
     
     public override Types.MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
     {
+        // Bishop darf nur Diagonal laufen
+        if (!IsDiagonal(fromTile, toTile)) return Types.MoveType.Invalid;
+        
         Grid.Tile direction = DetermineDirection(fromTile, toTile);
         
         if (IsFieldOnPath(grid, fromTile, targetTile:toTile, toTile, direction))
@@ -145,6 +161,9 @@ public class Rook(bool isWhite) : SlidingPieces(isWhite)
 
     public override Types.MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
     {
+        // Rook darf nur Vertical oder Horizontal laufen
+        if (!IsHorizontal(fromTile, toTile) || !IsVertical(fromTile, toTile)) return Types.MoveType.Invalid;
+        
         Grid.Tile direction = DetermineDirection(fromTile, toTile);
 
         if (IsFieldOnPath(grid, fromTile, targetTile:toTile, toTile, direction))
@@ -168,6 +187,10 @@ public class Queen(bool isWhite) : SlidingPieces(isWhite)
 
     public override Types.MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
     {
+        // Queen darf nur Vertical, Horizontal oder Diagonal laufen
+        if (!IsHorizontal(fromTile, toTile) || !IsVertical(fromTile, toTile) || !IsDiagonal(fromTile, toTile))
+            return Types.MoveType.Invalid;
+        
         Grid.Tile direction = DetermineDirection(fromTile, toTile);
 
         if (IsFieldOnPath(grid, fromTile, targetTile:toTile, toTile, direction))
