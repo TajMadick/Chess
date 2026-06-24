@@ -122,10 +122,10 @@ public static class Rules
 
         // letzte Prüfung kann Spieler eine Figur dazwischen bewegen 
         // und angreifende Figur muss ein Springer, Turm oder Dame sein
-        if (attacker is ISlidingPieces slidingPieceAttacker)
+        if (attacker is SlidingPieces slidingPieceAttacker and not King)
         {
             // alle Tiles zwischen König und Angreifer durchgehen
-            foreach (Grid.Tile tile in slidingPieceAttacker.FieldsOnPath(grid, attackerTile, kingTile))
+            foreach (Grid.Tile tile in slidingPieceAttacker.AllFieldsOnPath(grid, attackerTile, kingTile))
             {
                 // durch alle Verteidiger durchgehen
                 // wenn es keine Verteidiger gibt dann geht er kein einziges Mal durch
