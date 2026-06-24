@@ -2,32 +2,33 @@ namespace Schach;
 
 public static class Rules
 { 
-    public static IEnumerable<Grid.Tile> AllLegalMoves(Grid grid, Grid.Tile fromTile, bool isWhiteMoving)
+    public static IEnumerable<Grid.Tile> AllLegalMoves(Grid grid, Grid.Tile fromTile, Grid.Tile kingTile, bool kingMoves, bool isWhiteMoving)
     {
         // durch alle legalen Züge des Königs durchgehen und schauen obs eh nicht eigenes Feld oder Schach
         foreach (Grid.Tile possibleTile in grid[fromTile].AllMoves(grid, fromTile))
         {
             // Validation check
-            if (!Validation.IsTakingOwnPiece(ref grid.GetRef(possibleTile), isWhiteMoving) ||
-                Validation.IsMovingOwnPiece(ref grid.GetRef(fromTile), isWhiteMoving))
+            if (Validation.IsTakingOwnPiece(ref grid.GetRef(possibleTile), isWhiteMoving) ||
+                !Validation.IsMovingOwnPiece(ref grid.GetRef(fromTile), isWhiteMoving))
             {
-                yield return possibleTile;
+                continue;
             }
-        }
-    }
-
-    public static IEnumerable<Grid.Tile> AllLegalMovesKing(Grid grid, Grid.Tile kingTile, bool isWhiteMoving)
-    {
-        foreach (Grid.Tile possibleTile in AllLegalMoves(grid, kingTile, isWhiteMoving))
-        {
-            // Schauen, ob König eh nicht Schach ist, wenn er zum possible Tile geht
+            
+            // Figur bewegen
             Pieces oldPossibleTilePiece = grid[possibleTile];
-            grid[possibleTile] = grid[kingTile];
-            grid[kingTile] = new Empty();
+            grid[possibleTile] = grid[fromTile];
+            grid[fromTile] = new Empty();
 
-            bool isKingAttacked = IsAttackingField(grid, possibleTile, isWhiteMoving);
+            // Wenn Figur geht -> KingTile checken
+            // Wenn König geht -> possibleTile checken
+            bool isKingAttacked = kingMoves switch
+            {
+                true => IsAttackingField(grid, possibleTile, isWhiteMoving),
+                false => IsAttackingField(grid, kingTile, isWhiteMoving)
+            };
+                
 
-            grid[kingTile] = grid[possibleTile];
+            grid[fromTile] = grid[possibleTile];
             grid[possibleTile] = oldPossibleTilePiece;
 
             if (!isKingAttacked)
@@ -36,27 +37,20 @@ public static class Rules
             }
         }
     }
-
-    public static bool IsStalemate(Grid grid, bool isWhiteMoving)
+    public static bool IsStalemate(Grid grid, bool isWhiteChecking)
     {
+        Grid.Tile kingTile = FindKing(grid, isWhiteChecking);
         for (int row = 0; row < 8; row++)
         {
             for (int col = 0; col < 8; col++)
             {
                 Grid.Tile tile = new Grid.Tile(row, col);
-                if (grid[tile] is King)
+
+                bool kingMoves = grid[tile] is King ? true : false;
+                
+                if (AllLegalMoves(grid, tile, kingTile, kingMoves, isWhiteChecking).Any())
                 {
-                    if (AllLegalMovesKing(grid, tile, isWhiteMoving).Any())
-                    {
-                        return false;
-                    }
-                }
-                else
-                {
-                    if (AllLegalMoves(grid, tile, isWhiteMoving).Any())
-                    {
-                        return false;
-                    }
+                    return false;
                 }
             }
         }
@@ -79,7 +73,7 @@ public static class Rules
         }
 
         // als Erstes prüfen, ob König abhauen kann -> kein Schachmatt 
-        if (AllLegalMovesKing(grid, kingTile, isWhiteChecking).Any())
+        if (AllLegalMoves(grid, kingTile, kingTile, true, isWhiteChecking).Any())
         {
             return false;
         }

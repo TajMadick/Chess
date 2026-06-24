@@ -8,15 +8,16 @@ public class Game
     {
         // bevor das Spiel anfängt, prüfen, ob schon ein Checkmate ist
         // gecheckt wird die jeweils andere Farbe, die dran ist
-        if (Rules.IsCheckmate(grid, !IsWhiteMoving, IsWhiteMoving))
+        if (Rules.IsCheckmate(grid, isWhiteChecking:!IsWhiteMoving, IsWhiteMoving))
         {
             Board.DrawBoard(grid);
             Console.Write("Checkmate");
             return;
         }
         
-        // bevor das Spiel anfängt, prüfen, ob schon ein Checkmate ist
-        if (Rules.IsStalemate(grid, IsWhiteMoving) || Rules.IsStalemate(grid, !IsWhiteMoving))
+        // bevor das Spiel anfängt, prüfen, ob schon ein Stalemate ist
+        // gecheckt wird die jeweils andere Farbe, die dran ist
+        if (Rules.IsStalemate(grid, isWhiteChecking:IsWhiteMoving))
         {
             Board.DrawBoard(grid);
             Console.Write("Stalemate");
@@ -51,7 +52,7 @@ public class Game
                     break;
                 }
 
-                if (Rules.IsStalemate(grid, IsWhiteMoving))
+                if (Rules.IsStalemate(grid, isWhiteChecking:IsWhiteMoving))
                 {
                     Board.DrawBoard(grid);
                     Console.Write("Stalemate");
