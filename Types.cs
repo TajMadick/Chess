@@ -14,7 +14,8 @@ public static class Types
         Promotion,
         Castling,
         Normal,
-        EnPassant
+        EnPassant,
+        DoubleStepPawn
     }
 
     public enum PieceType

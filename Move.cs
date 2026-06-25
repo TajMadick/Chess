@@ -73,6 +73,20 @@ public static class Move
             return true;
         }
         
+        if (determinedMoveType == Types.MoveType.DoubleStepPawn && grid[fromTile] is Pawn doubleStepPawn)
+        {
+            if (MovePiece(grid, fromTile, toTile, isWhiteMoving))
+            { 
+                doubleStepPawn.IsEnPassantable = true;
+                doubleStepPawn.EnPassantExpiresIn = 2;
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+        
         if (determinedMoveType == Types.MoveType.Normal)
         {
             if (MovePiece(grid, fromTile, toTile, isWhiteMoving))

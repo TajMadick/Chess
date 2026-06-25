@@ -28,14 +28,13 @@ public class Pawn(bool isWhite) : Pieces(isWhite)
 {
     public override Pieces Copy()
     {
-        return new Pawn(IsWhite) { IsEnPassantable = IsEnPassantable };
+        return new Pawn(IsWhite) { IsEnPassantable = IsEnPassantable, EnPassantExpiresIn = EnPassantExpiresIn };
     }
     public bool IsEnPassantable { get; set; } = false;
+    public int EnPassantExpiresIn { get; set; } = 0;
     private bool IsPromotable(int row) => row == (IsWhite ? 0 : 7);
     public override Types.MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
     {
-        IsEnPassantable = false;
-        
         int start = (IsWhite) ? 6 : 1;
         int dir = (IsWhite) ? 1 : -1;
 
@@ -67,8 +66,7 @@ public class Pawn(bool isWhite) : Pieces(isWhite)
             // check if nextField and next-nextField is free
             if (grid[moveOneField, fromTile.Col] is Empty && grid[moveTwoField, fromTile.Col] is Empty)
             {
-                IsEnPassantable = true;
-                return Types.MoveType.Normal;
+                return Types.MoveType.DoubleStepPawn;
             }
         }
         

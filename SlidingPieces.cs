@@ -132,7 +132,7 @@ public class Bishop(bool isWhite) : SlidingPieces(isWhite)
     
     public override Types.MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
     {
-        // Bishop darf nur Diagonal laufen
+        // wenn Bishop NICHT Diagonal -> INVALID
         if (!IsDiagonal(fromTile, toTile)) return Types.MoveType.Invalid;
         
         Grid.Tile direction = DetermineDirection(fromTile, toTile);
@@ -161,8 +161,8 @@ public class Rook(bool isWhite) : SlidingPieces(isWhite)
 
     public override Types.MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
     {
-        // Rook darf nur Vertical oder Horizontal laufen
-        if (!IsHorizontal(fromTile, toTile) || !IsVertical(fromTile, toTile)) return Types.MoveType.Invalid;
+        // wenn Rook NICHT Vertical ODER Horizontal -> INVALID
+        if (!(IsHorizontal(fromTile, toTile) || IsVertical(fromTile, toTile))) return Types.MoveType.Invalid;
         
         Grid.Tile direction = DetermineDirection(fromTile, toTile);
 
@@ -187,8 +187,8 @@ public class Queen(bool isWhite) : SlidingPieces(isWhite)
 
     public override Types.MoveType DetermineMoveType(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
     {
-        // Queen darf nur Vertical, Horizontal oder Diagonal laufen
-        if (!IsHorizontal(fromTile, toTile) || !IsVertical(fromTile, toTile) || !IsDiagonal(fromTile, toTile))
+        // wenn Queen NICHT Vertical ODER Horizontal ODER Diagonal -> INVALID
+        if (!(IsHorizontal(fromTile, toTile) || IsVertical(fromTile, toTile) || IsDiagonal(fromTile, toTile)))
             return Types.MoveType.Invalid;
         
         Grid.Tile direction = DetermineDirection(fromTile, toTile);

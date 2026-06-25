@@ -6,6 +6,10 @@ public class Game
 
     public void GameLoop(Grid grid)
     {
+        Test.PossiblePositionsOfEachMove(grid, 3, IsWhiteMoving);
+        Console.ReadKey();
+
+        
         // bevor das Spiel anfängt, prüfen, ob schon ein Checkmate ist
         // gecheckt wird die jeweils andere Farbe, die dran ist
         if (Rules.IsCheckmate(grid, isWhiteChecking:!IsWhiteMoving, IsWhiteMoving))
@@ -26,6 +30,20 @@ public class Game
         
         while (true)
         {
+            
+            Console.WriteLine(Test.PossiblePositions(grid, 1, IsWhiteMoving));
+            Console.ReadKey();
+
+            Console.WriteLine(Test.PossiblePositions(grid, 2, IsWhiteMoving));
+            Console.ReadKey();
+            
+            Console.WriteLine(Test.PossiblePositions(grid, 3, IsWhiteMoving));
+            Console.ReadKey();
+            
+            Console.WriteLine(Test.PossiblePositions(grid, 4, IsWhiteMoving));
+            Console.ReadKey();
+            
+            
             Board.DrawBoard(grid);
 
             string color = (IsWhiteMoving) ? "White" : "Black";
@@ -58,6 +76,8 @@ public class Game
                     Console.Write("Stalemate");
                     break;
                 }
+
+                Rules.EnPassantExpires(grid);
             }
         }
     }

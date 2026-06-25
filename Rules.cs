@@ -2,7 +2,7 @@ namespace Schach;
 
 public static class Rules
 { 
-    public static IEnumerable<Grid.Tile> AllLegalMoves(Grid grid, Grid.Tile fromTile, Grid.Tile kingTile, bool kingMoves, bool isWhiteMoving)
+    public static IEnumerable<Grid.Tile> AllLegalMoves(Grid grid, Grid.Tile fromTile, Grid.Tile kingTile, bool isWhiteMoving)
     {
         // durch alle legalen Züge des Königs durchgehen und schauen obs eh nicht eigenes Feld oder Schach
         foreach (Grid.Tile possibleTile in grid[fromTile].AllMoves(grid, fromTile))
@@ -18,10 +18,10 @@ public static class Rules
             Pieces oldPossibleTilePiece = grid[possibleTile];
             grid[possibleTile] = grid[fromTile];
             grid[fromTile] = new Empty();
-
+            
             // Wenn Figur geht -> KingTile checken
             // Wenn König geht -> possibleTile checken
-            bool isKingAttacked = kingMoves switch
+            bool isKingAttacked = (grid[fromTile] is King) switch
             {
                 true => IsAttackingField(grid, possibleTile, isWhiteMoving),
                 false => IsAttackingField(grid, kingTile, isWhiteMoving)
@@ -37,6 +37,21 @@ public static class Rules
             }
         }
     }
+
+    public static void EnPassantExpires(Grid grid)
+    {
+        for (int row = 0; row < 8; row++)
+        {
+            for (int col = 0; col < 8; col++)
+            {
+                if (grid[row, col] is Pawn { IsEnPassantable: true } enPassantPawn)
+                {
+                    enPassantPawn.EnPassantExpiresIn--;
+                    if (enPassantPawn.EnPassantExpiresIn <= 0) enPassantPawn.IsEnPassantable = false;
+                }
+            }
+        }
+    }
     public static bool IsStalemate(Grid grid, bool isWhiteChecking)
     {
         Grid.Tile kingTile = FindKing(grid, isWhiteChecking);
@@ -45,10 +60,7 @@ public static class Rules
             for (int col = 0; col < 8; col++)
             {
                 Grid.Tile tile = new Grid.Tile(row, col);
-
-                bool kingMoves = grid[tile] is King ? true : false;
-                
-                if (AllLegalMoves(grid, tile, kingTile, kingMoves, isWhiteChecking).Any())
+                if (AllLegalMoves(grid, tile, kingTile, isWhiteChecking).Any())
                 {
                     return false;
                 }
@@ -73,7 +85,7 @@ public static class Rules
         }
 
         // als Erstes prüfen, ob König abhauen kann -> kein Schachmatt 
-        if (AllLegalMoves(grid, kingTile, kingTile, true, isWhiteChecking).Any())
+        if (AllLegalMoves(grid, kingTile, kingTile, isWhiteChecking).Any())
         {
             return false;
         }
