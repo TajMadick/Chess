@@ -1,8 +1,23 @@
 namespace Schach;
 
-public static class Board
+public class Board
 {
-    public static void DrawBoard(Grid grid)
+    public bool IsWhiteMoving { get; set; } = true;
+    public Grid Grid = new Grid();
+    private Stack<Move> allMoves = new Stack<Move>();
+    
+    /*
+    private Pieces lastCapturedPiece;
+    private Grid.Tile lastToTile;       // lastToTile sind die Koordinaten von dem lastCapturedPiece
+    private Grid.Tile lastFromTile;
+    */
+
+    public Board(string fen)
+    {
+        FenParser(fen);
+    }
+    
+    public void DrawBoard()
     {
         Console.Clear();
         Console.WriteLine("    a   b   c   d   e   f   g   h");
@@ -11,14 +26,47 @@ public static class Board
             Console.Write($" {8-row} ");
             for (int col = 0; col < 8; col++)
             {
-                Console.Write($"[{grid[row, col].GetIcon()} ]");
+                Console.Write($"[{Grid[row, col].GetIcon()} ]");
             }
             Console.Write($" {8-row} ");
             Console.WriteLine();
         }
         Console.WriteLine("    a   b   c   d   e   f   g   h");
     }
-    public static void FenParser(string fen, Grid grid, Game game)
+
+    public bool MakeMove(Grid.Tile fromTile, Grid.Tile toTile)
+    {
+        Move newMove = Grid[fromTile].DetermineMoveType(Grid, fromTile, toTile) switch
+        {
+            Types.MoveType.Normal => new NormalMove(Grid, fromTile, toTile),
+            Types.MoveType.Castling => new CastlingMove(Grid, fromTile, toTile),
+            Types.MoveType.DoubleStepPawn => new DoubleStepPawnMove(Grid, fromTile, toTile),
+            Types.MoveType.EnPassant => new EnPassantMove(Grid, fromTile, toTile),
+            Types.MoveType.Promotion => new PromotionMove(Grid, fromTile, toTile),
+            _ => new InvalidMove(Grid, fromTile, toTile)
+        };
+
+        if (!newMove.TryDoMove(Grid, IsWhiteMoving))
+        {
+            return false;
+        }
+        allMoves.Push(newMove);
+        SwitchColorToMove();
+        return true;
+    }
+
+    public void UnmakeMove()
+    {
+        Move lastMove = allMoves.Pop();
+        lastMove.UndoMove(Grid);
+        SwitchColorToMove();
+    }
+
+    public void SwitchColorToMove()
+    {
+        IsWhiteMoving = !IsWhiteMoving;
+    }
+    private void FenParser(string fen)
     {
         string[] parts = fen.Split(' ');
         string[] rows = parts[0].Split('/');
@@ -35,7 +83,7 @@ public static class Board
                     int number = character - '0';
                     while (number > 0)
                     {
-                        grid[row, col] = new Empty();
+                        Grid[row, col] = new Empty();
                         number--;
                         col++;
                     }
@@ -45,7 +93,7 @@ public static class Board
                     // wenn der Buchstabe groß ist, ist die Figur weiß
                     bool isWhite = char.IsUpper(character);
                     // schauen welcher Buchstabe unabhängig ob groß oder klein
-                    grid[row, col] = char.ToLower(character) switch
+                    Grid[row, col] = char.ToLower(character) switch
                     {
                         'r' => new Rook(isWhite),
                         'n' => new Knight(isWhite),
@@ -62,8 +110,8 @@ public static class Board
         }
         
 
-        if (parts[1] == "w") game.IsWhiteMoving = true;
-        else if (parts[1] == "b") game.IsWhiteMoving = false;
+        if (parts[1] == "w") IsWhiteMoving = true;
+        else if (parts[1] == "b") IsWhiteMoving = false;
         
         foreach (char character in parts[2])
         {
@@ -76,7 +124,7 @@ public static class Board
                 _ => new Grid.Tile(-1,-1)
             };
             
-            if (tile.IsValid() && grid[tile.Row, tile.Col] is Rook rook)
+            if (tile.IsValid() && Grid[tile.Row, tile.Col] is Rook rook)
             {
                 rook.HasMoved = false;
             }
@@ -88,14 +136,14 @@ public static class Board
             int col = parts[3][0] - 'a';
             if (parts[3][1] == '3')
             {
-                if (grid[4, col] is Pawn pawn)
+                if (Grid[4, col] is Pawn pawn)
                 {
                     pawn.IsEnPassantable = true;
                 }
             }
             if (parts[3][1] == '6')
             {
-                if (grid[3, col] is Pawn pawn)
+                if (Grid[3, col] is Pawn pawn)
                 {
                     pawn.IsEnPassantable = true;
                 }

@@ -2,51 +2,35 @@ namespace Schach;
 
 public class Game
 {
-    public bool IsWhiteMoving { get; set; } = true;
-
-    public void GameLoop(Grid grid)
+    public void GameLoop(Board board)
     {
-        Test.PossiblePositionsOfEachMove(grid, 3, IsWhiteMoving);
+        Console.WriteLine(Test.PossiblePositions(board, 3, board.IsWhiteMoving, true));
         Console.ReadKey();
 
         
         // bevor das Spiel anfängt, prüfen, ob schon ein Checkmate ist
         // gecheckt wird die jeweils andere Farbe, die dran ist
-        if (Rules.IsCheckmate(grid, isWhiteChecking:!IsWhiteMoving, IsWhiteMoving))
+        if (Rules.IsCheckmate(board, isWhiteChecking:!board.IsWhiteMoving, board.IsWhiteMoving))
         {
-            Board.DrawBoard(grid);
+            board.DrawBoard();
             Console.Write("Checkmate");
             return;
         }
         
         // bevor das Spiel anfängt, prüfen, ob schon ein Stalemate ist
         // gecheckt wird die jeweils andere Farbe, die dran ist
-        if (Rules.IsStalemate(grid, isWhiteChecking:IsWhiteMoving))
+        if (Rules.IsStalemate(board, isWhiteChecking:board.IsWhiteMoving))
         {
-            Board.DrawBoard(grid);
+            board.DrawBoard();
             Console.Write("Stalemate");
             return;
         }
         
         while (true)
         {
-            
-            Console.WriteLine(Test.PossiblePositions(grid, 1, IsWhiteMoving));
-            Console.ReadKey();
+            board.DrawBoard();
 
-            Console.WriteLine(Test.PossiblePositions(grid, 2, IsWhiteMoving));
-            Console.ReadKey();
-            
-            Console.WriteLine(Test.PossiblePositions(grid, 3, IsWhiteMoving));
-            Console.ReadKey();
-            
-            Console.WriteLine(Test.PossiblePositions(grid, 4, IsWhiteMoving));
-            Console.ReadKey();
-            
-            
-            Board.DrawBoard(grid);
-
-            string color = (IsWhiteMoving) ? "White" : "Black";
+            string color = (board.IsWhiteMoving) ? "White" : "Black";
             Console.Write($"{color} move: ");
                 
             string? userInput = Console.ReadLine();
@@ -56,28 +40,28 @@ public class Game
                 break;
             }
             
-            if (!Validation.PassesSanityChecks(grid, userInput, IsWhiteMoving)) continue;
+            if (!Validation.PassesSanityChecks(board.Grid, userInput, board.IsWhiteMoving)) continue;
             Utils.CalculateCoordinates(userInput, out Grid.Tile fromTile, out Grid.Tile toTile);
 
 
-            if (Move.InputMove(grid, fromTile, toTile, IsWhiteMoving))
+            if (board.MakeMove(fromTile, toTile))
             { 
-                IsWhiteMoving = !IsWhiteMoving;
-                if (Rules.IsCheckmate(grid, IsWhiteMoving, IsWhiteMoving))
+                board.SwitchColorToMove();
+                if (Rules.IsCheckmate(board, isWhiteChecking:board.IsWhiteMoving, board.IsWhiteMoving))
                 {
-                    Board.DrawBoard(grid);
+                    board.DrawBoard();
                     Console.Write("Checkmate");
                     break;
                 }
 
-                if (Rules.IsStalemate(grid, isWhiteChecking:IsWhiteMoving))
+                if (Rules.IsStalemate(board, isWhiteChecking:board.IsWhiteMoving))
                 {
-                    Board.DrawBoard(grid);
+                    board.DrawBoard();
                     Console.Write("Stalemate");
                     break;
                 }
 
-                Rules.EnPassantExpires(grid);
+                Rules.EnPassantExpires(board.Grid);
             }
         }
     }

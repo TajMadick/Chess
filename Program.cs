@@ -6,11 +6,9 @@ namespace Schach
     {
         static void Main()
         {
-            Grid grid = new Grid();
+            Board board = new Board("r3k3/p1ppqpb1/bn2pnpr/3PN3/1p2P3/5Q1p/PPPBBPPP/RN2K2R w KQq - 2 2");
             Game game = new Game();
-            //Board.FenParser("7k/8/4R3/8/4Q3/8/8/7K w KQkq - 0 1", grid, game);
-            Board.FenParser("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", grid, game);
-            game.GameLoop(grid);
+            game.GameLoop(board);
         }
     }
 }

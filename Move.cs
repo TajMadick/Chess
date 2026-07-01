@@ -1,141 +1,218 @@
-
 namespace Schach;
 
-public static class Move
+public abstract class Move(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
 {
-    public static bool InputMove(Grid grid, Grid.Tile fromTile, Grid.Tile toTile, bool isWhiteMoving)
+    protected readonly Grid.Tile FromTile = fromTile;
+    protected readonly Grid.Tile ToTile = toTile;
+    protected readonly Pieces OriginalFromPiece = grid[fromTile];
+    protected readonly Pieces OriginalToPiece = grid[toTile];
+    private bool OriginalHasMoved;
+
+    protected void DoStandardMove(Grid grid)
     {
-        ref Pieces fromPiece = ref grid.GetRef(fromTile);
-        ref Pieces toPiece = ref grid.GetRef(toTile);
+        grid[ToTile] = OriginalFromPiece;
+        grid[FromTile] = new Empty();
+        
+        if (grid[ToTile] is King king) OriginalHasMoved = king.HasMoved;
+        if (grid[ToTile] is Rook rook) OriginalHasMoved = rook.HasMoved;
+    }
+    protected void UndoStandardMove(Grid grid)
+    {
+        grid[ToTile] = OriginalToPiece;
+        grid[FromTile] = OriginalFromPiece;
+        
+        if (grid[ToTile] is King king) king.HasMoved = OriginalHasMoved;
+        if (grid[ToTile] is Rook rook) rook.HasMoved = OriginalHasMoved;
+    }
 
-        Types.MoveType determinedMoveType = fromPiece.DetermineMoveType(grid, fromTile, toTile);
-
-        if (determinedMoveType == Types.MoveType.Promotion)
+    protected bool IsKingAttackedAfterMove(Grid grid, bool isWhiteMoving)
+    {
+        return (grid[fromTile] is King) switch
         {
-            if (MovePiece(grid, fromTile, toTile, isWhiteMoving))
-            { 
-                toPiece = new Queen(isWhiteMoving);
-                return true;
-            }
-            else
+            true => Rules.IsAttackingField(grid, ToTile, isWhiteMoving),
+            false => Rules.IsAttackingField(grid, Rules.FindKing(grid, isWhiteMoving), isWhiteMoving)
+        };
+    }
+    
+    public abstract bool TryDoMove(Grid grid, bool isWhiteMoving);
+    public abstract void UndoMove(Grid grid);
+}
+
+public class NormalMove(Grid grid, Grid.Tile fromTile, Grid.Tile toTile) : Move(grid, fromTile, toTile)
+{
+    public override bool TryDoMove(Grid grid, bool isWhiteMoving)
+    {
+        DoStandardMove(grid);
+        if (IsKingAttackedAfterMove(grid, isWhiteMoving))
+        {
+            UndoMove(grid);
+            return false;
+        }
+
+        return true;
+    }
+    public override void UndoMove(Grid grid)
+    {
+        UndoStandardMove(grid);
+    }
+}
+public class CastlingMove : Move
+{
+    private Rook OriginalRook;
+    private Grid.Tile RookFromTile;
+    private Grid.Tile RookToTile;
+
+    private int castlingDir;
+
+    public CastlingMove(Grid grid, Grid.Tile fromTile, Grid.Tile toTile) : base(grid, fromTile, toTile)
+    {
+        int diffCol = toTile.Col - fromTile.Col;
+        int rookCol = (diffCol > 0) ? 7 : 0;
+        castlingDir = (diffCol > 0) ? 1 : -1;
+        
+        RookFromTile = new Grid.Tile(fromTile.Row, rookCol);
+        RookToTile = new Grid.Tile(fromTile.Row, fromTile.Col + castlingDir);
+        OriginalRook = (Rook)grid[RookFromTile];
+    }
+    private bool IsValid(Grid grid, bool isWhiteMoving)
+    {
+        // Tiles dazwischen checken, ob in check und mit toCol+CastlingDir auch das Tile wohin King will
+        // +dir, weil Schleife geht nur bis zu dem toCol und bricht da ab bevor er prüft mit +CastlingDir geht er eins weiter
+        for (int col = FromTile.Col; col != (ToTile.Col + castlingDir); col += castlingDir)
+        {
+            if (Rules.IsAttackingField(grid, new Grid.Tile(ToTile.Row, col), isWhiteMoving))
             {
                 return false;
             }
         }
-        
-        if (determinedMoveType == Types.MoveType.EnPassant)
+
+        return true;
+    }
+    public override bool TryDoMove(Grid grid, bool isWhiteMoving)
+    {
+        if (IsValid(grid, isWhiteMoving))
         {
-            if (MovePiece(grid, fromTile, toTile, isWhiteMoving))
-            { 
-                int diffCol = toTile.Col - fromTile.Col;
-                
-                // Bauern daneben schlagen
-                grid[fromTile.Row, fromTile.Col + diffCol] = new Empty();
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        }
-        
-        if (determinedMoveType == Types.MoveType.Castling)
-        {
-            int diffCol = toTile.Col - fromTile.Col;
-            
-            // note bei castling ist fromRow immer toRow
-            int dir = (diffCol > 0) ? 1 : -1;
-            int rookCol = (diffCol > 0) ? 7 : 0;
-            
-            // Tiles dazwischen checken, ob in check und mit toCol+dir auch das Tile wohin King will
-            // +dir, weil Schleife geht nur bis zu dem toCol und bricht da ab bevor er prüft mit +dir geht er eins weiter
-            for (int col = fromTile.Col; col != (toTile.Col+dir); col += dir)
-            {
-                if (Rules.IsAttackingField(grid, new Grid.Tile(toTile.Row, col), isWhiteMoving))
-                {
-                    Console.Write("Can't castle! Tiles are in check");
-                    Console.ReadKey();
-                    return false;
-                }
-            }
+            grid[RookToTile] = OriginalRook;
+            grid[RookFromTile] = new Empty();
 
-            ref Pieces fromRookTile = ref grid.GetRef(fromTile.Row, rookCol);
-            ref Pieces toRookTile = ref grid.GetRef(fromTile.Row, fromTile.Col + dir);
-
-            // moving rook
-            toRookTile = fromRookTile;
-            fromRookTile = new Empty();
-
-            // moving king
-            toPiece = fromPiece;
-            fromPiece = new Empty();
+            grid[ToTile] = OriginalFromPiece;
+            grid[FromTile] = new Empty();
 
             return true;
-        }
-        
-        if (determinedMoveType == Types.MoveType.DoubleStepPawn && grid[fromTile] is Pawn doubleStepPawn)
-        {
-            if (MovePiece(grid, fromTile, toTile, isWhiteMoving))
-            { 
-                doubleStepPawn.IsEnPassantable = true;
-                doubleStepPawn.EnPassantExpiresIn = 2;
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        }
-        
-        if (determinedMoveType == Types.MoveType.Normal)
-        {
-            if (MovePiece(grid, fromTile, toTile, isWhiteMoving))
-            { 
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        }
-        
-        if (determinedMoveType == Types.MoveType.Invalid)
-        {
-            Console.WriteLine("Incorrect movement");
-            Console.ReadKey();
-            return false;
         }
 
         return false;
     }
 
-    private static bool MovePiece(Grid grid, Grid.Tile fromTile, Grid.Tile  toTile, bool isWhiteMoving)
+    public override void UndoMove(Grid grid)
     {
-        if (grid[fromTile] is King king) king.HasMoved = true;
-        if (grid[fromTile] is Rook rook) rook.HasMoved = true;
+        grid[RookToTile] = new Empty();
+        grid[RookFromTile] = OriginalRook;
+
+        grid[ToTile] = new Empty();
+        grid[FromTile] = OriginalFromPiece;
+    }
+}
+public class DoubleStepPawnMove : Move
+{
+    private int OriginalExpiration;
+    private bool OriginalIsEnPassantable;
+    
+    public DoubleStepPawnMove(Grid grid, Grid.Tile fromTile, Grid.Tile toTile) : base(grid, fromTile, toTile)
+    {
+        Pawn pawn = (Pawn)grid[fromTile];
+        OriginalIsEnPassantable = pawn.IsEnPassantable;
+        OriginalExpiration = pawn.EnPassantExpiresIn;
+    }
+    public override bool TryDoMove(Grid grid, bool isWhiteMoving)
+    {
+        DoStandardMove(grid);
         
-        // Check if King will be in Check after moving
-        Grid temporaryGrid = TemporaryMove(grid, fromTile, toTile);
-        if (Rules.IsAttackingField(temporaryGrid,Rules.FindKing(temporaryGrid, isWhiteMoving), isWhiteMoving))
+        Pawn pawn = (Pawn)grid[ToTile];
+        pawn.IsEnPassantable = true;
+        pawn.EnPassantExpiresIn = 2;
+
+        if (IsKingAttackedAfterMove(grid, isWhiteMoving))
         {
-            Console.Write($"Your King will be in Check");
-            Console.ReadKey();
+            UndoMove(grid);
             return false;
         }
-        else
-        {
-            // Kein Check man kann bewegen
-            grid[toTile] = grid[fromTile];
-            grid[fromTile] = new Empty();
-            return true;
-        }
+
+        return true;
     }
-    
-    public static Grid TemporaryMove(Grid grid, Grid.Tile fromTile, Grid.Tile toTile)
+
+    public override void UndoMove(Grid grid)
     {
-        Grid temporaryGrid = new Grid(grid);
-        temporaryGrid[toTile] = temporaryGrid[fromTile];
-        temporaryGrid[fromTile] = new Empty();
-        return temporaryGrid;
+        UndoStandardMove(grid);
+        Pawn pawn = (Pawn)grid[FromTile];
+        pawn.IsEnPassantable = OriginalIsEnPassantable;
+        pawn.EnPassantExpiresIn = OriginalExpiration;
     }
+}
+
+public class EnPassantMove : Move
+{    
+    private Pawn OriginalKilledPawn;
+    private Grid.Tile KilledPawnTile;
+    
+    public EnPassantMove(Grid grid, Grid.Tile fromTile, Grid.Tile toTile) : base(grid, fromTile, toTile)
+    {
+        int diffCol = toTile.Col - fromTile.Col;
+        
+        KilledPawnTile = new Grid.Tile(fromTile.Row, fromTile.Col + diffCol);
+        OriginalKilledPawn = (Pawn)grid[KilledPawnTile];
+    }
+
+    public override bool TryDoMove(Grid grid, bool isWhiteMoving)
+    {
+        DoStandardMove(grid);
+        // Bauern daneben schlagen
+        grid[KilledPawnTile] = new Empty();
+        
+        if (IsKingAttackedAfterMove(grid, isWhiteMoving))
+        {
+            UndoMove(grid);
+            return false;
+        }
+
+        return true;
+    }
+
+    public override void UndoMove(Grid grid)
+    {
+        UndoStandardMove(grid);
+        grid[KilledPawnTile] = OriginalKilledPawn;
+    }
+}
+
+public class PromotionMove(Grid grid, Grid.Tile fromTile, Grid.Tile toTile) : Move(grid, fromTile, toTile)
+{
+    public override bool TryDoMove(Grid grid, bool isWhiteMoving)
+    {
+        grid[ToTile] = new Queen(isWhiteMoving);
+        grid[FromTile] = new Empty();
+        
+        if (IsKingAttackedAfterMove(grid, isWhiteMoving))
+        {
+            UndoMove(grid);
+            return false;
+        }
+
+        return true;
+    }
+    public override void UndoMove(Grid grid)
+    {
+        UndoStandardMove(grid);
+    }
+}
+
+public class InvalidMove(Grid grid, Grid.Tile fromTile, Grid.Tile toTile) : Move(grid, fromTile, toTile)
+{
+    public override bool TryDoMove(Grid grid, bool isWhiteMoving)
+    {
+        return false;
+    }
+
+    public override void UndoMove(Grid grid)
+    { }
 }

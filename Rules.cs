@@ -2,37 +2,22 @@ namespace Schach;
 
 public static class Rules
 { 
-    public static IEnumerable<Grid.Tile> AllLegalMoves(Grid grid, Grid.Tile fromTile, Grid.Tile kingTile, bool isWhiteMoving)
+    public static IEnumerable<Grid.Tile> AllLegalMoves(Board board, Grid.Tile fromTile, Grid.Tile kingTile, bool isWhiteMoving)
     {
         // durch alle legalen Züge des Königs durchgehen und schauen obs eh nicht eigenes Feld oder Schach
-        foreach (Grid.Tile possibleTile in grid[fromTile].AllMoves(grid, fromTile))
+        foreach (Grid.Tile possibleTile in board.Grid[fromTile].AllMoves(board.Grid, fromTile))
         {
             // Validation check
-            if (Validation.IsTakingOwnPiece(ref grid.GetRef(possibleTile), isWhiteMoving) ||
-                !Validation.IsMovingOwnPiece(ref grid.GetRef(fromTile), isWhiteMoving))
+            if (Validation.IsTakingOwnPiece(ref board.Grid.GetRef(possibleTile), isWhiteMoving) ||
+                !Validation.IsMovingOwnPiece(ref board.Grid.GetRef(fromTile), isWhiteMoving))
             {
                 continue;
             }
             
             // Figur bewegen
-            Pieces oldPossibleTilePiece = grid[possibleTile];
-            grid[possibleTile] = grid[fromTile];
-            grid[fromTile] = new Empty();
-            
-            // Wenn Figur geht -> KingTile checken
-            // Wenn König geht -> possibleTile checken
-            bool isKingAttacked = (grid[fromTile] is King) switch
+            if (board.MakeMove(fromTile, possibleTile))
             {
-                true => IsAttackingField(grid, possibleTile, isWhiteMoving),
-                false => IsAttackingField(grid, kingTile, isWhiteMoving)
-            };
-                
-
-            grid[fromTile] = grid[possibleTile];
-            grid[possibleTile] = oldPossibleTilePiece;
-
-            if (!isKingAttacked)
-            {
+                board.UnmakeMove();
                 yield return possibleTile;
             }
         }
@@ -52,15 +37,15 @@ public static class Rules
             }
         }
     }
-    public static bool IsStalemate(Grid grid, bool isWhiteChecking)
+    public static bool IsStalemate(Board board, bool isWhiteChecking)
     {
-        Grid.Tile kingTile = FindKing(grid, isWhiteChecking);
+        Grid.Tile kingTile = FindKing(board.Grid, isWhiteChecking);
         for (int row = 0; row < 8; row++)
         {
             for (int col = 0; col < 8; col++)
             {
                 Grid.Tile tile = new Grid.Tile(row, col);
-                if (AllLegalMoves(grid, tile, kingTile, isWhiteChecking).Any())
+                if (AllLegalMoves(board, tile, kingTile, isWhiteChecking).Any())
                 {
                     return false;
                 }
@@ -69,65 +54,48 @@ public static class Rules
 
         return true;
     }
-    public static bool IsCheckmate(Grid grid, bool isWhiteChecking, bool isWhiteMoving)
+    public static bool IsCheckmate(Board board, bool isWhiteChecking, bool isWhiteMoving)
     {
         // Prüfen ob König überhaupt angegriffen wird -> wenn nein kein Schachmatt
-        Grid.Tile kingTile = FindKing(grid, isWhiteChecking);
-        if (!IsAttackingField(grid, kingTile, isWhiteChecking))
+        Grid.Tile kingTile = FindKing(board.Grid, isWhiteChecking);
+        if (!IsAttackingField(board.Grid, kingTile, isWhiteChecking))
         {
             return false;
         }
         // wenn sein König momentan Check ist aber er nicht dran ist ist Checkmate
         // (passiert nur bei custom fen Notation)
-        else if (IsAttackingField(grid, kingTile, isWhiteChecking) && isWhiteMoving != isWhiteChecking)
+        else if (IsAttackingField(board.Grid, kingTile, isWhiteChecking) && isWhiteMoving != isWhiteChecking)
         {
             return true;
         }
 
         // als Erstes prüfen, ob König abhauen kann -> kein Schachmatt 
-        if (AllLegalMoves(grid, kingTile, kingTile, isWhiteChecking).Any())
+        if (AllLegalMoves(board, kingTile, kingTile, isWhiteChecking).Any())
         {
             return false;
         }
 
         // Wenn der König nicht abhauen kann und mehr wie ein Angreifer ist -> Schachmatt
-        if (CountAttacking(grid, kingTile, isWhiteChecking) > 1)
+        if (CountAttacking(board.Grid, kingTile, isWhiteChecking) > 1)
         {
             return true;
         }
         
-
-        Grid.Tile attackerTile = GetAttackerTile(grid, kingTile, isWhiteChecking);
-        ref Pieces attacker = ref grid.GetRef(attackerTile);
+        Grid.Tile attackerTile = GetAttackerTile(board.Grid, kingTile, isWhiteChecking);
+        ref Pieces attacker = ref board.Grid.GetRef(attackerTile);
 
         // kann der Angreifer geschlagen werden
-        if (IsAttackingField(grid, attackerTile, !isWhiteChecking)) 
+        if (IsAttackingField(board.Grid, attackerTile, isWhiteAttacked:!isWhiteChecking)) 
             // isWhiteMoving = true er schaut, ob weiß geschlagen werden kann bei diesem Feld
             // wir wollen aber genau umgekehrt schauen kann der Angreifer geschlagen werden
         {
-            foreach (Grid.Tile defenderTile in GetAllAttackerTiles(grid, attackerTile, !isWhiteChecking))
+            foreach (Grid.Tile defenderTile in GetAllAttackerTiles(board.Grid, attackerTile, !isWhiteChecking))
             {
-                // wenn Verteidiger König ist schauen, ob er beim Verteidigen nicht ins Schach kommt
-                if (grid[defenderTile] is King)
+                // Schauen, ob der Move legal wäre, wenn ja kein Schachmatt
+                if (board.MakeMove(defenderTile, attackerTile))
                 {
-                    // temporäres Feld machen und mit König verteidigen
-                    // König geht zur Angreifer Position und schauen ob er da in Check ist
-                    Grid temporaryGrid = Move.TemporaryMove(grid, kingTile, attackerTile);
-                    if (!IsAttackingField(temporaryGrid, attackerTile, isWhiteChecking))
-                    {
-                        return false;
-                    }
-                }
-                // Verteidiger ist nicht der König
-                else
-                {
-                    // temporäres Feld machen und mit der Figur verteidigen
-                    // wenn König danach nicht Schach ist kein Schachmatt
-                    Grid temporaryGrid = Move.TemporaryMove(grid, defenderTile, attackerTile);
-                    if (!IsAttackingField(temporaryGrid, kingTile, isWhiteChecking))
-                    {
-                        return false;
-                    }
+                    board.UnmakeMove();
+                    return false;
                 }
             }
         }
@@ -137,22 +105,18 @@ public static class Rules
         if (attacker is SlidingPieces slidingPieceAttacker and not King)
         {
             // alle Tiles zwischen König und Angreifer durchgehen
-            foreach (Grid.Tile tile in slidingPieceAttacker.AllFieldsOnPath(grid, attackerTile, kingTile))
+            foreach (Grid.Tile tile in slidingPieceAttacker.AllFieldsOnPath(board.Grid, attackerTile, kingTile))
             {
                 // durch alle Verteidiger durchgehen
                 // wenn es keine Verteidiger gibt dann geht er kein einziges Mal durch
                 // es wird für alle Verteidiger geprüft, ob sie auf das Feld dazwischen gehen dürfen
-                foreach (Grid.Tile defenderTile in GetAllAttackerTiles(grid, tile, !isWhiteChecking))
+                foreach (Grid.Tile defenderTile in GetAllAttackerTiles(board.Grid, tile, !isWhiteChecking))
                 {
-                    // wenn dieser Verteidiger der König ist -> darf er nicht
-                    if (grid[defenderTile] is not King)
+                    // Schauen, ob der Move legal wäre, wenn ja kein Schachmatt
+                    if (board.MakeMove(defenderTile, attackerTile))
                     {
-                        // wenn König danach nicht Schach ist kein Schachmatt
-                        Grid temporaryGrid = Move.TemporaryMove(grid, defenderTile, attackerTile);
-                        if (!IsAttackingField(temporaryGrid, kingTile, isWhiteChecking))
-                        {
-                            return false;
-                        }
+                        board.UnmakeMove();
+                        return false;
                     }
                 }
             }
@@ -178,29 +142,29 @@ public static class Rules
 
         return new Grid.Tile(-1, -1);
     }
-    public static bool IsAttackingField(Grid grid, Grid.Tile toTile, bool isWhite)
+    public static bool IsAttackingField(Grid grid, Grid.Tile toTile, bool isWhiteAttacked)
     {
-        return SearchAttackingPreset(grid, toTile, isWhite).Any();
+        return SearchAttackingPreset(grid, toTile, isWhiteAttacked).Any();
     }
     
-    public static IEnumerable<Grid.Tile> GetAllAttackerTiles(Grid grid, Grid.Tile toTile, bool isWhite)
+    public static IEnumerable<Grid.Tile> GetAllAttackerTiles(Grid grid, Grid.Tile toTile, bool isWhiteAttacked)
     {
-        return SearchAttackingPreset(grid, toTile, isWhite).Select(((tuple) => tuple.attacker));
+        return SearchAttackingPreset(grid, toTile, isWhiteAttacked).Select(((tuple) => tuple.attacker));
     }
 
     // kann man nur benutzen, wenn man geprüft hat IsAttackingField !!!
-    public static int CountAttacking(Grid grid, Grid.Tile toTile, bool isWhite)
+    public static int CountAttacking(Grid grid, Grid.Tile toTile, bool isWhiteAttacked)
     {
-        return SearchAttackingPreset(grid, toTile, isWhite).Last().count;
+        return SearchAttackingPreset(grid, toTile, isWhiteAttacked).Last().count;
     }
     
     // kann man nur benutzen, wenn Count Attacking == 1!!!
-    public static Grid.Tile GetAttackerTile(Grid grid, Grid.Tile toTile, bool isWhite)
+    public static Grid.Tile GetAttackerTile(Grid grid, Grid.Tile toTile, bool isWhiteAttacked)
     {
-        return SearchAttackingPreset(grid, toTile, isWhite).First().attacker;
+        return SearchAttackingPreset(grid, toTile, isWhiteAttacked).First().attacker;
     }
     
-    private static IEnumerable<(int count, Grid.Tile attacker)> SearchAttackingPreset(Grid grid, Grid.Tile toTile, bool isWhite)
+    private static IEnumerable<(int count, Grid.Tile attacker)> SearchAttackingPreset(Grid grid, Grid.Tile toTile, bool isWhiteAttacked)
     {
         int count = 0;
         
@@ -211,11 +175,11 @@ public static class Rules
             {
                 Grid.Tile attackerTile = new Grid.Tile(attackerRow, attackerCol);
                 // sucht nur die gegensätzliche Farbe -> Aufruf von weiß -> sucht nur schwarze Figuren ab
-                if (grid[attackerTile].IsWhite != isWhite && 
+                if (grid[attackerTile].IsWhite != isWhiteAttacked && 
                     grid[attackerTile].DetermineMoveType(grid, attackerTile, toTile) != Types.MoveType.Invalid)
                 {
                     count++;
-                    yield return (count, attackerTile);
+                     yield return (count, attackerTile);
                 }
             }
         }

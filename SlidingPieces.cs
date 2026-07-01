@@ -57,8 +57,8 @@ public abstract class SlidingPieces(bool isWhite) : Pieces(isWhite)
         private bool Runner(Grid grid, Grid.Tile fromTile, Grid.Tile targetTile, Grid.Tile lowerBound, Grid.Tile upperBound, Grid.Tile direction)
     {
         // gleich mal eins in die Richtung gehen damit man nicht auf selben Feld startet
-        int row = fromTile.Row += direction.Row;
-        int col = fromTile.Col += direction.Col;
+        int row = fromTile.Row + direction.Row;
+        int col = fromTile.Col + direction.Col;
         
         for (; row > lowerBound.Row && row < upperBound.Row && col > lowerBound.Col && col < upperBound.Col; 
              row += direction.Row, col += direction.Col)
@@ -224,17 +224,21 @@ public class King(bool isWhite) : SlidingPieces(isWhite)
         {
             return Types.MoveType.Normal;
         }
+
+        // Castling ist nur möglich wenn 2 Horizontal und 0 Vertikal gemoved wird
+        if (Math.Abs(diffCol) != 2 && Math.Abs(diffRow) != 0) return Types.MoveType.Invalid;
         
-        // soll nur horizontale direction herausfinden deshalb row = 0
         Grid.Tile direction = DetermineDirection(fromTile, toTile);
-        direction.Row = 0;
         
         int start = (IsWhite) ? 7 : 0;
         int rookCol = (diffCol > 0) ? 7 : 0;
+
+        Grid.Tile rookTile = new Grid.Tile(start, rookCol);
         
-        if (!HasMoved && grid[start, rookCol] is Rook { HasMoved: false })
+        if (!HasMoved && grid[rookTile] is Rook { HasMoved: false })
         {
-            if (IsFieldOnPath(grid, fromTile, targetTile:toTile, toTile, direction))
+            // rookTile als target da bis dorthin frei sein muss
+            if (IsFieldOnPath(grid, fromTile, targetTile:rookTile, rookTile, direction))
             {
                 return Types.MoveType.Castling;
             }
